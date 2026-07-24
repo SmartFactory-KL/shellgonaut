@@ -1,0 +1,162 @@
+package client
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"time"
+
+	"github.com/aas-core-works/aas-core3.1-golang/jsonization"
+	"github.com/aas-core-works/aas-core3.1-golang/types"
+)
+
+type DiscoveryClient struct {
+	httpClient *http.Client
+	baseURL    *url.URL
+}
+
+func NewDiscoveryClient(baseURL string) (*DiscoveryClient, error) {
+	discoveryBaseURL, err := EnsureUrlWithoutSuffixOrSlash(baseURL, "/lookup/shells")
+	if err != nil {
+		return nil, fmt.Errorf("invalid url for discovery: %w", err)
+	}
+
+	client := &DiscoveryClient{
+		httpClient: &http.Client{
+			Timeout: time.Second * 10,
+			Transport: &http.Transport{
+				MaxIdleConns:        100,
+				MaxIdleConnsPerHost: 20,
+				IdleConnTimeout:     90 * time.Second,
+				TLSHandshakeTimeout: 5 * time.Second,
+			},
+		},
+
+		baseURL: discoveryBaseURL,
+	}
+
+	return client, nil
+}
+
+// ---------------------------------------- Desription -----------------------------
+// GetDescription calls the /description endpoint. Might be used to check for availability. Returns raw JSON
+func (discClient *DiscoveryClient) GetDiscoveryDescription() ([]byte, error) {
+	resp, err := discClient.httpClient.Get(
+		discClient.baseURL.JoinPath("/description").String(),
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to GET /description: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("non-200 response for GET /description: %s", resp.Status)
+	}
+
+	var result []byte
+	result, err = io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response bytes for GET /description: %w", err)
+	}
+
+	return result, nil
+}
+
+// ---------------------------------------- Lookup ----------------------------------
+
+func (discClient *DiscoveryClient) GetShellIDList(assetID []types.ISpecificAssetID) {
+	// seems to be paginated
+}
+
+// ---------------------------------------- ShellID -> AssetID ----------------------
+// GetAssetIDListJsonable gets the list of jsonables representing the SpecificAssetIDs that were discovered for shellID
+func (discClient *DiscoveryClient) GetAssetIDListJsonable(shellID string) ([]map[string]any, error) {
+	targetUrl, err := getEncodedTargetUrl(discClient.baseURL, "/lookup/shells", shellID)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := DoGetRequest(discClient.httpClient, targetUrl.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to discover asset ids for shell %s: %w", shellID, err)
+	}
+	defer body.Close()
+
+	var resultList []map[string]any
+	if err := json.NewDecoder(body).Decode(&resultList); err != nil {
+		return nil, fmt.Errorf("failed to parse to json: %w", err)
+	}
+
+	return resultList, nil
+}
+
+// GetAssetIDList returnes a list of parse SpecificAssetIDs that were discovered for shellID
+func (discClient *DiscoveryClient) GetAssetIDList(shellID string) ([]types.ISpecificAssetID, error) {
+	listJsonable, err := discClient.GetAssetIDListJsonable(shellID)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(listJsonable) == 0 {
+		// could be just an empty list, so no error
+		return []types.ISpecificAssetID{}, nil
+	}
+
+	resultIDList := make([]types.ISpecificAssetID, 0, len(listJsonable))
+	for _, itemJsonable := range listJsonable {
+		specificAssetID, err := jsonization.SpecificAssetIDFromJsonable(itemJsonable)
+		if err != nil {
+			// hmm - abort because of one mismatch?
+			return nil, fmt.Errorf("failed to convert jsonable into SpecificAssetID: %w", err)
+		}
+
+		resultIDList = append(resultIDList, specificAssetID)
+	}
+
+	return resultIDList, nil
+}
+
+// UploadAssetIDList uploads a new set of SpecificAssetIDs to POST /lookup/shells/:shellID
+func (discClient *DiscoveryClient) UploadAssetIDList(shellID string, assetIDList []types.ISpecificAssetID) error {
+	if len(assetIDList) == 0 {
+		return fmt.Errorf("assetIDList cannot be nil or empty")
+	}
+
+	assetListBytes, err := aasEntityListToBytes(assetIDList)
+	if err != nil {
+		return fmt.Errorf("failed to convert asset ids into bytes: %w", err)
+	}
+
+	targetUrl, err := getEncodedTargetUrl(discClient.baseURL, "/lookup/shells", shellID)
+	if err != nil {
+		return err
+	}
+
+	body, err := DoPostRequest(discClient.httpClient, targetUrl.String(), assetListBytes)
+	if err != nil {
+		return err
+	}
+	defer body.Close()
+
+	// temporary
+	return nil
+}
+
+// DeleteAssetIDList deletes everything for a shellID by DELETE /lookup/shells/:shellID
+func (discClient *DiscoveryClient) DeleteAssetIDList(shellID string) error {
+	targetUrl, err := getEncodedTargetUrl(discClient.baseURL, "/lookup/shells", shellID)
+	if err != nil {
+		return err
+	}
+
+	body, err := DoDeleteRequest(discClient.httpClient, targetUrl.String())
+	if err != nil {
+		return err
+	}
+	defer body.Close()
+
+	return nil
+}

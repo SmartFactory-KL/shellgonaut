@@ -1,12 +1,15 @@
 package client
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 
+	"github.com/SmartFactory-KL/shellgonaut/create"
 	"github.com/aas-core-works/aas-core3.1-golang/jsonization"
 	"github.com/aas-core-works/aas-core3.1-golang/types"
 )
@@ -41,7 +44,7 @@ func NewShellRepositoryClient(baseURL string) (*ShellRepositoryClient, error) {
 }
 
 // ---------------------------------------- Desription -----------------------------
-// GetDescription calls the /description endpoint. Might be used to check for availability. Returns raw JSON
+// GetShellRepositoryDescription calls the /description endpoint. Might be used to check for availability. Returns raw JSON
 func (repoClient *ShellRepositoryClient) GetShellRepositoryDescription() ([]byte, error) {
 	resp, err := repoClient.httpClient.Get(
 		repoClient.baseURL.JoinPath("/description").String(),
@@ -66,7 +69,68 @@ func (repoClient *ShellRepositoryClient) GetShellRepositoryDescription() ([]byte
 }
 
 // ---------------------------------------- Shell Pages ----------------------------
-// TODO: add GetAllShellPages() and GetNextShellPage(cursor)
+// GetNextShellPage requests the next page starting from cursor. empty cursor starts from the beginning, limit = 0 means no limit
+// however: basyx usually has a limit anyway.
+func (repoClient *ShellRepositoryClient) GetNextShellPage(cursor string, limit int) (*BasyxPagedResult[types.IAssetAdministrationShell], error) {
+	targetUrl := repoClient.baseURL.JoinPath("/shells")
+
+	request, err := http.NewRequest(http.MethodGet, targetUrl.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct request: %w", err)
+	}
+
+	if len(cursor) > 0 {
+		request.Header.Add("cursor", cursor)
+	}
+
+	if limit > 0 {
+		request.Header.Add("limit", strconv.FormatInt(int64(limit), 10))
+	}
+
+	resp, err := repoClient.httpClient.Do(request)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusOK {
+		// read page
+		var basyxResultRaw BasyxPagedResultRaw
+		if err := json.NewDecoder(resp.Body).Decode(&basyxResultRaw); err != nil {
+			return nil, fmt.Errorf("request returned %s but decoding failed: %w", resp.Status, err)
+		}
+
+		// copy metadata
+		var basyxResult BasyxPagedResult[types.IAssetAdministrationShell]
+		basyxResult.Metadata = basyxResultRaw.Metadata
+		basyxResult.Result = make([]types.IAssetAdministrationShell, 0, len(basyxResultRaw.Result))
+
+		// return early for empty or nil result
+		if len(basyxResultRaw.Result) == 0 {
+			return &basyxResult, nil
+		}
+
+		// convert raw messages to AAS
+		for _, rawJsonInput := range basyxResultRaw.Result {
+			shell, err := create.FromBytes(rawJsonInput, jsonization.AssetAdministrationShellFromJsonable)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse AAS: %w", err)
+			}
+
+			basyxResult.Result = append(basyxResult.Result, shell)
+		}
+
+		return &basyxResult, nil
+	} else {
+		// try to read errors
+		var errorResult BasyxErrorResult
+		if err := json.NewDecoder(resp.Body).Decode(&errorResult); err != nil {
+			return nil, fmt.Errorf("request failed with status %s but error could not be decoded: %w", resp.Status, err)
+		}
+
+		return nil, errorResult
+	}
+}
 
 // ---------------------------------------- Shells  --------------------------------
 // GetSubmodelJsonable gets a shell in the "jsonable" format (as map[string]any - fit for jsonization)

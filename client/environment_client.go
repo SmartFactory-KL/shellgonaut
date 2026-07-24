@@ -5,27 +5,18 @@ import (
 	"log/slog"
 )
 
-type BasyxEnvironmentClient struct {
+type AASEnvironmentClient struct {
 	ShellRepositoryClient
 	SubmodelRepositoryClient
 }
 
-type BasyxRepositoryClientConfig struct {
+type AASEnvironmentClientConfig struct {
 	ShellRepositoryBaseUrl    string
 	SubmodelRepositoryBaseUrl string
 }
 
-// TODO: This module is intended to become a standalone Go based Basyx client for internal use
-// TODO: to be published on GitHub. Thats why it is so extensive for now.
-
-// TODO: General Notes on how this can become a Standalone Client
-// TODO: For only a single repository, this would be fine. But since registries are a thing,
-// TODO: one would need to create a single BasyxRepoClient for all repositories present within a registry
-// TODO: whenever they come up. So this RepositoryClient should be accessible through another layer,
-// TODO: which could be a "SingleRepoClient" or a "RegistryClient" or even a "DiscoveryClient"
-
-// NewBasyxRepositoryClient creates a ShellClient with integrated http client
-func NewBasyxRepositoryClient(cfg *BasyxRepositoryClientConfig) (*BasyxEnvironmentClient, error) {
+// NewAASEnvironmentClient creates a ShellClient with integrated http client
+func NewAASEnvironmentClient(cfg *AASEnvironmentClientConfig) (*AASEnvironmentClient, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("invalid config: cannot be nil")
 	}
@@ -40,7 +31,7 @@ func NewBasyxRepositoryClient(cfg *BasyxRepositoryClientConfig) (*BasyxEnvironme
 		return nil, fmt.Errorf("failed to create submodel repository client: %w", err)
 	}
 
-	return &BasyxEnvironmentClient{
+	return &AASEnvironmentClient{
 		ShellRepositoryClient:    *shellRepoClient,
 		SubmodelRepositoryClient: *submodelRepoClient,
 	}, nil
@@ -48,7 +39,7 @@ func NewBasyxRepositoryClient(cfg *BasyxRepositoryClientConfig) (*BasyxEnvironme
 
 // CheckTargetAvailability calls the /description endpoint of both repos
 // as a basic health check
-func (envClient *BasyxEnvironmentClient) CheckTargetAvailability() error {
+func (envClient *AASEnvironmentClient) CheckTargetAvailability() error {
 	if _, err := envClient.GetShellRepositoryDescription(); err != nil {
 		return fmt.Errorf("shell repository description not readable: %w", err)
 	}

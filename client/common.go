@@ -56,6 +56,35 @@ func aasEntityToBytes(entity types.IClass) ([]byte, error) {
 	return entityJson, nil
 }
 
+// aasEntityListToBytes applies aasEntityToBytes to all items within entityList
+// while still returning a single []byte
+// containing the json list
+func aasEntityListToBytes[T types.IClass](entityList []T) ([]byte, error) {
+	if len(entityList) == 0 {
+		return nil, fmt.Errorf("list cannot be nil or empty")
+	}
+
+	result := make([]json.RawMessage, 0, len(entityList))
+
+	for _, entityItem := range entityList {
+		item, err := aasEntityToBytes(entityItem)
+		if err != nil {
+			// TODO: Similar to other places: Should a single invalid item really
+			// TODO: stop the whole operation?
+			return nil, fmt.Errorf("failed to convert list item: %w", err)
+		}
+
+		result = append(result, item)
+	}
+
+	resultJson, err := json.Marshal(result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal list: %w", err)
+	}
+
+	return resultJson, nil
+}
+
 // createReferenceForSubmodel creates a reference that can be attached to the "submodels" property of a shell
 func createReferenceForSubmodel(submodel types.ISubmodel) (types.IReference, error) {
 	if submodel == nil {
