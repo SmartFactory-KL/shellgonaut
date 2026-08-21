@@ -53,7 +53,7 @@ func NewDerivedSubmodelServiceClient(httpClient *http.Client, baseURL *url.URL) 
 	}
 }
 
-// ---------------------------------------- Desription -----------------------------
+// ---------------------------------------- Description -----------------------------
 // GetSubmodelServiceDescription calls the /description endpoint and returns raw json
 func (serviceClient *SubmodelServiceClient) GetSubmodelServiceDescription() ([]byte, error) {
 	resp, err := serviceClient.httpClient.Get(

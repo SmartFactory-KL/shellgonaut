@@ -18,6 +18,7 @@ type ConceptDescriptionRepositoryClient struct {
 	baseURL    *url.URL
 }
 
+// NewConceptDescriptionRepositoryClient creates a standalons concept description repository client
 func NewConceptDescriptionRepositoryClient(baseURL string, opts ...ClientOption) (*ConceptDescriptionRepositoryClient, error) {
 	cdRepoBaseURL, err := EnsureUrlWithoutSuffixOrSlash(baseURL, ConceptDescriptionRepositoryPath)
 	if err != nil {
@@ -37,7 +38,7 @@ func NewConceptDescriptionRepositoryClient(baseURL string, opts ...ClientOption)
 	return client, nil
 }
 
-// ---------------------------------------- Desription -----------------------------
+// ---------------------------------------- Description -----------------------------
 // GetConceptDescriptionRepositoryDescription calls the /description endpoint. Might be used to check for availability. Returns raw JSON
 func (repoClient *ConceptDescriptionRepositoryClient) GetConceptDescriptionRepositoryDescription() ([]byte, error) {
 	resp, err := repoClient.httpClient.Get(
@@ -141,6 +142,7 @@ func (repoClient *ConceptDescriptionRepositoryClient) UploadConceptDescription(c
 	return nil
 }
 
+// UpdateConceptDescription updates a single concept description
 func (repoClient *ConceptDescriptionRepositoryClient) UpdateConceptDescription(cdID string, conceptDescription types.IConceptDescription) error {
 	if conceptDescription == nil {
 		return fmt.Errorf("concept description cannot be nil")
@@ -165,6 +167,7 @@ func (repoClient *ConceptDescriptionRepositoryClient) UpdateConceptDescription(c
 	return nil
 }
 
+// DeleteConceptDescription removes a single concept description
 func (repoClient *ConceptDescriptionRepositoryClient) DeleteConceptDescription(cdID string) error {
 	targetUrl, err := getEncodedTargetUrl(repoClient.baseURL, ConceptDescriptionRepositoryPath, cdID)
 	if err != nil {

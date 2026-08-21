@@ -38,7 +38,7 @@ func NewSubmodelRepositoryClient(baseURL string, opts ...ClientOption) (*Submode
 	return client, nil
 }
 
-// ---------------------------------------- Desription -----------------------------
+// ---------------------------------------- Description -----------------------------
 // GetSubmodelRepositoryDescription calls the /description endpoint. Might be used to check for availability. Returns raw JSON
 func (repoClient *SubmodelRepositoryClient) GetSubmodelRepositoryDescription() ([]byte, error) {
 	resp, err := repoClient.httpClient.Get(

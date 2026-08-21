@@ -37,7 +37,7 @@ func NewDiscoveryClient(baseURL string, opts ...ClientOption) (*DiscoveryClient,
 	return client, nil
 }
 
-// ---------------------------------------- Desription -----------------------------
+// ---------------------------------------- Description -----------------------------
 // GetDescription calls the /description endpoint. Might be used to check for availability. Returns raw JSON
 func (discClient *DiscoveryClient) GetDiscoveryDescription() ([]byte, error) {
 	resp, err := discClient.httpClient.Get(

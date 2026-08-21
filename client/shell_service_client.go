@@ -52,7 +52,7 @@ func NewDerivedShellServiceClient(httpClient *http.Client, baseURL *url.URL) *Sh
 	}
 }
 
-// ---------------------------------------- Desription -----------------------------
+// ---------------------------------------- Description -----------------------------
 // GetShellServiceDescription calls the /description endpoint and returns raw json
 func (serviceClient *ShellServiceClient) GetShellServiceDescription() ([]byte, error) {
 	resp, err := serviceClient.httpClient.Get(

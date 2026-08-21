@@ -2,6 +2,7 @@ package client
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 )
@@ -31,4 +32,29 @@ func NewShellRegistryClient(baseURL string, opts ...ClientOption) (*ShellRegistr
 	}
 
 	return client, nil
+}
+
+// ---------------------------------------- Description -----------------------------
+// GetShellRegistryDescription calls the /description endpoint. Might be used to check for availability. Returns raw JSON
+func (regClient *ShellRegistryClient) GetShellRegistryDescription() ([]byte, error) {
+	resp, err := regClient.httpClient.Get(
+		regClient.baseURL.JoinPath("/description").String(),
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to GET /description: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("non-200 response for GET /description: %s", resp.Status)
+	}
+
+	var result []byte
+	result, err = io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response bytes for GET /description: %w", err)
+	}
+
+	return result, nil
 }

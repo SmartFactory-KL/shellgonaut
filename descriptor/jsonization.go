@@ -77,8 +77,29 @@ func EndpointFromJsonable(jsonable any) (IEndpoint, error) {
 }
 
 func endpointFromMap(m map[string]any) (result IEndpoint, err error) {
-	//TODO: Finish
-	return nil, nil
+	var theInterface string
+	var theProtocolInformation IProtocolInformation
+
+	for k, v := range m {
+		switch k {
+		case "interface":
+			parsedString, err := stringFromJsonable(v)
+			if err != nil {
+				return nil, prependName(err, k)
+			}
+			theInterface = parsedString
+		case "protocolInformation":
+			parsedProtocolInformation, err := ProtocolInformationFromJsonable(v)
+			if err != nil {
+				return nil, prependName(err, k)
+			}
+			theProtocolInformation = parsedProtocolInformation
+		}
+	}
+
+	item := NewEndpoint(theInterface, theProtocolInformation)
+
+	return item, nil
 }
 
 func ProtocolInformationFromJsonable(jsonable any) (IProtocolInformation, error) {

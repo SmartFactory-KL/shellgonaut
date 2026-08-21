@@ -38,7 +38,7 @@ func NewShellRepositoryClient(baseURL string, opts ...ClientOption) (*ShellRepos
 	return client, nil
 }
 
-// ---------------------------------------- Desription -----------------------------
+// ---------------------------------------- Description -----------------------------
 // GetShellRepositoryDescription calls the /description endpoint. Might be used to check for availability. Returns raw JSON
 func (repoClient *ShellRepositoryClient) GetShellRepositoryDescription() ([]byte, error) {
 	resp, err := repoClient.httpClient.Get(

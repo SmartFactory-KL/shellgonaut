@@ -2,8 +2,12 @@ package client
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
+
+	"github.com/SmartFactory-KL/shellgonaut/create"
+	"github.com/SmartFactory-KL/shellgonaut/descriptor"
 )
 
 const SubmodelRegistryPath = "/submodel-descriptors"
@@ -31,4 +35,54 @@ func NewSubmodelRegistryClient(baseURL string, opts ...ClientOption) (*SubmodelR
 	}
 
 	return client, nil
+}
+
+// ---------------------------------------- Description -----------------------------
+// GetSubmodelRegistryDescription calls the /description endpoint. Might be used to check for availability. Returns raw JSON
+func (regClient *SubmodelRegistryClient) GetSubmodelRegistryDescription() ([]byte, error) {
+	resp, err := regClient.httpClient.Get(
+		regClient.baseURL.JoinPath("/description").String(),
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to GET /description: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("non-200 response for GET /description: %s", resp.Status)
+	}
+
+	var result []byte
+	result, err = io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response bytes for GET /description: %w", err)
+	}
+
+	return result, nil
+}
+
+// -------------------------- Submodel Descriptors --------------------------------
+// GetNextSubmodelDescriptorPage requests the next page of submodel descriptors
+func (regClient *SubmodelRegistryClient) GetNextSubmodelDescriptorPage(cursor string, limit int) (*PagedResult[descriptor.ISubmodelDescriptor], error) {
+	targetURL := regClient.baseURL.JoinPath(SubmodelRegistryPath)
+
+	pagedResult, err := DoPagedGetRequest(regClient.httpClient, targetURL.String(), cursor, limit)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+
+	var typedResult PagedResult[descriptor.ISubmodelDescriptor]
+	typedResult.Metadata = pagedResult.Metadata
+	typedResult.Result = make([]descriptor.ISubmodelDescriptor, 0, len(pagedResult.Result))
+
+	for _, rawIn := range pagedResult.Result {
+		submodelDescriptor, err := create.FromBytes(rawIn, descriptor.SubmodelDescriptorFromJsonable)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse submodel descriptor: %w", err)
+		}
+		typedResult.Result = append(typedResult.Result, submodelDescriptor)
+	}
+
+	return &typedResult, nil
 }

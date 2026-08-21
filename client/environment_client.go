@@ -8,11 +8,13 @@ import (
 type AASEnvironmentClient struct {
 	ShellRepositoryClient
 	SubmodelRepositoryClient
+	ConceptDescriptionRepositoryClient
 }
 
 type AASEnvironmentClientConfig struct {
 	ShellRepositoryBaseUrl    string
 	SubmodelRepositoryBaseUrl string
+	ConceptDescriptionBaseUrl string
 }
 
 // NewAASEnvironmentClient creates a ShellClient with integrated http client
@@ -31,9 +33,15 @@ func NewAASEnvironmentClient(cfg *AASEnvironmentClientConfig, opts ...ClientOpti
 		return nil, fmt.Errorf("failed to create submodel repository client: %w", err)
 	}
 
+	cdRepoClient, err := NewConceptDescriptionRepositoryClient(cfg.ConceptDescriptionBaseUrl, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create concept description repository client: %w", err)
+	}
+
 	return &AASEnvironmentClient{
-		ShellRepositoryClient:    *shellRepoClient,
-		SubmodelRepositoryClient: *submodelRepoClient,
+		ShellRepositoryClient:              *shellRepoClient,
+		SubmodelRepositoryClient:           *submodelRepoClient,
+		ConceptDescriptionRepositoryClient: *cdRepoClient,
 	}, nil
 }
 
@@ -48,7 +56,11 @@ func (envClient *AASEnvironmentClient) CheckTargetAvailability() error {
 		return fmt.Errorf("submodel repository description not readable: %w", err)
 	}
 
-	slog.Info("BasyxRepositoryClient: Repositories Check OK")
+	if _, err := envClient.GetConceptDescriptionRepositoryDescription(); err != nil {
+		return fmt.Errorf("concept description repository description not readable: %w", err)
+	}
+
+	slog.Info("AASEnvironmentClient: Repositories Check OK")
 
 	return nil
 }
