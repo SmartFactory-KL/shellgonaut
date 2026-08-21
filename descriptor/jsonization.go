@@ -2,8 +2,6 @@ package descriptor
 
 import (
 	"fmt"
-
-	"github.com/aas-core-works/aas-core3.1-golang/types"
 )
 
 /**
@@ -28,18 +26,18 @@ func AssetAdministrationShellDescriptorFromJsonable(jsonable any) (IAssetAdminis
 }
 
 func shellDescriptorFromMap(m map[string]any) (result IAssetAdministrationShellDescriptor, err error) {
-	var theDescription types.ILangStringTextType
-	var theDisplayName types.ILangStringNameType
-	var theExtensions []types.IExtension
-	var theAdministration types.IAdministrativeInformation
-	var theAssetKind *types.AssetKind
-	var theAssetType *string
-	var theEndpoints []IEndpoint
-	var theGlobalAssetID *string
-	var theIDShort *string
-	var theID string
-	var theSpecificAssetIDs []types.ISpecificAssetID
-	var theSubmodelDescriptors []ISubmodelDescriptor
+	// var theDescription types.ILangStringTextType
+	// var theDisplayName types.ILangStringNameType
+	// var theExtensions []types.IExtension
+	// var theAdministration types.IAdministrativeInformation
+	// var theAssetKind *types.AssetKind
+	// var theAssetType *string
+	// var theEndpoints []IEndpoint
+	// var theGlobalAssetID *string
+	// var theIDShort *string
+	// var theID string
+	// var theSpecificAssetIDs []types.ISpecificAssetID
+	// var theSubmodelDescriptors []ISubmodelDescriptor
 
 	// TODO: Finish
 	return nil, nil

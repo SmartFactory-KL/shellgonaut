@@ -1,2 +1,4 @@
 github.com/aas-core-works/aas-core3.1-golang v1.0.0-rc1 h1:53liY22USVfiZuLQoSQAlAKYkrMiV0g+aIw9hzH3EmA=
 github.com/aas-core-works/aas-core3.1-golang v1.0.0-rc1/go.mod h1:/VkiKzedgGfMirWOqStE6QhRdzJgJBqW+4belc1/qZ8=
+golang.org/x/oauth2 v0.36.0 h1:peZ/1z27fi9hUOFCAZaHyrpWG5lwe0RJEEEeH0ThlIs=
+golang.org/x/oauth2 v0.36.0/go.mod h1:YDBUJMTkDnJS+A4BP4eZBjCqtokkg1hODuPjwiGPO7Q=

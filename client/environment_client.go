@@ -16,17 +16,17 @@ type AASEnvironmentClientConfig struct {
 }
 
 // NewAASEnvironmentClient creates a ShellClient with integrated http client
-func NewAASEnvironmentClient(cfg *AASEnvironmentClientConfig) (*AASEnvironmentClient, error) {
+func NewAASEnvironmentClient(cfg *AASEnvironmentClientConfig, opts ...ClientOption) (*AASEnvironmentClient, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("invalid config: cannot be nil")
 	}
 
-	shellRepoClient, err := NewShellRepositoryClient(cfg.ShellRepositoryBaseUrl)
+	shellRepoClient, err := NewShellRepositoryClient(cfg.ShellRepositoryBaseUrl, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create shell repository client: %w", err)
 	}
 
-	submodelRepoClient, err := NewSubmodelRepositoryClient(cfg.SubmodelRepositoryBaseUrl)
+	submodelRepoClient, err := NewSubmodelRepositoryClient(cfg.SubmodelRepositoryBaseUrl, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create submodel repository client: %w", err)
 	}

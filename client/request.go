@@ -2,16 +2,78 @@ package client
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 )
 
 var (
 	ErrNotFound      = errors.New("entity not found")
 	ErrAlreadyExists = errors.New("entity already exists")
 )
+
+type AdditionalHeader struct {
+	Key   string
+	Value string
+}
+
+func DoPagedGetRequest(httpClient *http.Client, targetUrl string, cursor string, limit int, additionalHeaders ...AdditionalHeader) (*PagedResultRaw, error) {
+	request, err := http.NewRequest(http.MethodGet, targetUrl, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to craft Paged GET request: %w", err)
+	}
+
+	if len(cursor) > 0 {
+		request.Header.Add("cursor", cursor)
+	}
+
+	if limit > 0 {
+		request.Header.Add("limit", strconv.Itoa(limit))
+	}
+
+	if len(additionalHeaders) > 0 {
+		for _, header := range additionalHeaders {
+			request.Header.Add(header.Key, header.Value)
+		}
+	}
+
+	resp, err := httpClient.Do(request)
+	if err != nil {
+		return nil, fmt.Errorf("Paged GET request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusOK {
+		// read raw result
+		var pagedResultRaw PagedResultRaw
+		if err := json.NewDecoder(resp.Body).Decode(&pagedResultRaw); err != nil {
+			return nil, fmt.Errorf("request returned %s but decoding JSON failed: %w", resp.Status, err)
+		}
+
+		return &pagedResultRaw, nil
+	} else {
+		// read error
+		var errorResult ErrorResult
+		result, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("request failed with status %s and reading response also failed: %w", resp.Status, err)
+		}
+
+		if err := json.Unmarshal(result, &errorResult); err != nil {
+			return nil, fmt.Errorf(
+				"request failed with status %s but decoding error json also failed with %w for response %s",
+				resp.Status,
+				err,
+				string(result),
+			)
+		}
+
+		return nil, errorResult
+	}
+}
 
 func DoGetRequest(httpClient *http.Client, targetUrl string) (io.ReadCloser, error) {
 	return doRequest(httpClient, http.MethodGet, targetUrl, nil)

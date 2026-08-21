@@ -42,6 +42,35 @@ func FromBytes[T types.IClass](input []byte, jsonizationFunction func(any) (T, e
 	return element, nil
 }
 
+func ListFromBytes[T types.IClass](input []byte, jsonizationFunction func(any) (T, error)) ([]T, error) {
+	var inputList []json.RawMessage
+
+	if err := json.Unmarshal(input, &inputList); err != nil {
+		return []T{}, fmt.Errorf("failed to unmarshal input to list: %w", err)
+	}
+
+	return ListFromJsonRawMessages(inputList, jsonizationFunction)
+}
+
+func ListFromJsonRawMessages[T types.IClass](inputList []json.RawMessage, jsonizationFunction func(any) (T, error)) ([]T, error) {
+	if len(inputList) == 0 {
+		return []T{}, nil
+	}
+
+	var resultList []T = []T{}
+
+	for idx, inputItem := range inputList {
+		resultItem, err := FromBytes(inputItem, jsonizationFunction)
+		if err != nil {
+			return []T{}, fmt.Errorf("failure on #%d", idx)
+		}
+
+		resultList = append(resultList, resultItem)
+	}
+
+	return resultList, nil
+}
+
 // ToBytes is a helper to create json []byte from any types.IClass
 func ToBytes(input types.IClass) ([]byte, error) {
 	jsonable, err := jsonization.ToJsonable(input)
@@ -58,7 +87,7 @@ func ToBytes(input types.IClass) ([]byte, error) {
 }
 
 // ListToBytes is ToBytes, but for lists!
-func ListToBytes(input []types.ISubmodelElement) ([]byte, error) {
+func ListToBytes[T types.IClass](input []T) ([]byte, error) {
 	result := []json.RawMessage{}
 
 	for idx, entry := range input {

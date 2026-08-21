@@ -8,25 +8,33 @@ import (
 	"github.com/aas-core-works/aas-core3.1-golang/types"
 )
 
-type BasyxPagedResultMetadata struct {
+// ------------------ Paged Results ------------
+type PagedResultMetadata struct {
 	Cursor string `json:"cursor"`
 }
 
-type BasyxPagedResultRaw struct {
-	Metadata BasyxPagedResultMetadata `json:"paging_metadata"`
-	Result   []json.RawMessage        `json:"result"`
+type PagedResultRaw struct {
+	Metadata PagedResultMetadata `json:"paging_metadata"`
+	Result   []json.RawMessage   `json:"result"`
 }
 
-type BasyxPagedResult[T types.IClass] struct {
-	Metadata BasyxPagedResultMetadata
+type PagedResult[T types.IClass] struct {
+	Metadata PagedResultMetadata
 	Result   []T
 }
 
-type BasyxErrorResult struct {
-	Messages []BasyxErrorResultMessage `json:"messages"`
+type PagedStringResult struct {
+	Metadata PagedResultMetadata
+	Result   []string
 }
 
-type BasyxErrorResultMessage struct {
+// -------------- Error Results ----------------------
+
+type ErrorResult struct {
+	Messages []ErrorResultMessage `json:"messages"`
+}
+
+type ErrorResultMessage struct {
 	Timestamp     string `json:"timestamp"`
 	Text          string `json:"text"`
 	Code          string `json:"code"`
@@ -34,7 +42,7 @@ type BasyxErrorResultMessage struct {
 	MessageType   string `json:"messageType"`
 }
 
-func (r BasyxErrorResult) Error() string {
+func (r ErrorResult) Error() string {
 	if len(r.Messages) == 0 {
 		return "BaSyx returned an unknown error"
 	}
@@ -63,4 +71,28 @@ func (r BasyxErrorResult) Error() string {
 	}
 
 	return strings.Join(parts, "; ")
+}
+
+// --------------------- Operation ----------------
+
+type OperationRequest struct {
+	InputArguments    []types.IOperationVariable
+	InoutputArguments []types.IOperationVariable
+}
+
+type OperationRequestJSON struct {
+	InputArguments    []json.RawMessage `json:"inputArguments"`
+	InoutputArguments []json.RawMessage `json:"inoutputArguments"`
+}
+
+type OperationResult struct {
+	Success           bool
+	OutputArguments   []types.IOperationVariable
+	InoutputArguments []types.IOperationVariable
+}
+
+type OperationResultJSON struct {
+	Success           bool              `json:"success"`
+	OutputArguments   []json.RawMessage `json:"outputArguments"`
+	InoutputArguments []json.RawMessage `json:"inoutputArguments"`
 }

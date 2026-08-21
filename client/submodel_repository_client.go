@@ -1,18 +1,17 @@
 package client
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
-	"strconv"
-	"time"
 
 	"github.com/SmartFactory-KL/shellgonaut/create"
 	"github.com/aas-core-works/aas-core3.1-golang/jsonization"
 	"github.com/aas-core-works/aas-core3.1-golang/types"
 )
+
+const SubmodelRepositoryPath = "/submodels"
 
 type SubmodelRepositoryClient struct {
 	httpClient *http.Client
@@ -20,31 +19,27 @@ type SubmodelRepositoryClient struct {
 }
 
 // NewSubmodelRepositoryClient creates a new Submodel Repository Client while validating baseURL
-func NewSubmodelRepositoryClient(baseURL string) (*SubmodelRepositoryClient, error) {
-	submodelRepoBaseURL, err := EnsureUrlWithoutSuffixOrSlash(baseURL, "/submodels")
+func NewSubmodelRepositoryClient(baseURL string, opts ...ClientOption) (*SubmodelRepositoryClient, error) {
+	submodelRepoBaseURL, err := EnsureUrlWithoutSuffixOrSlash(baseURL, SubmodelRepositoryPath)
 	if err != nil {
 		return nil, fmt.Errorf("invalid url for submodel repository: %w", err)
 	}
 
-	client := &SubmodelRepositoryClient{
-		httpClient: &http.Client{
-			Timeout: time.Second * 10,
-			Transport: &http.Transport{
-				MaxIdleConns:        100,
-				MaxIdleConnsPerHost: 20,
-				IdleConnTimeout:     90 * time.Second,
-				TLSHandshakeTimeout: 5 * time.Second,
-			},
-		},
+	httpClient, err := createHttpClientFromOptions(opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create http client: %w", err)
+	}
 
-		baseURL: submodelRepoBaseURL,
+	client := &SubmodelRepositoryClient{
+		httpClient: httpClient,
+		baseURL:    submodelRepoBaseURL,
 	}
 
 	return client, nil
 }
 
 // ---------------------------------------- Desription -----------------------------
-// GetDescription calls the /description endpoint. Might be used to check for availability. Returns raw JSON
+// GetSubmodelRepositoryDescription calls the /description endpoint. Might be used to check for availability. Returns raw JSON
 func (repoClient *SubmodelRepositoryClient) GetSubmodelRepositoryDescription() ([]byte, error) {
 	resp, err := repoClient.httpClient.Get(
 		repoClient.baseURL.JoinPath("/description").String(),
@@ -71,128 +66,53 @@ func (repoClient *SubmodelRepositoryClient) GetSubmodelRepositoryDescription() (
 // ---------------------------------------- Submodel Pages ---------------------------
 // GetNextSubmodelPage requests the next page starting from cursor. empty cursor starts from the beginning, limit = 0 means no limit
 // however: basyx usually has a limit anyway.
-func (repoClient *SubmodelRepositoryClient) GetNextSubmodelPage(cursor string, limit int) (*BasyxPagedResult[types.ISubmodel], error) {
-	targetUrl := repoClient.baseURL.JoinPath("/submodels")
+func (repoClient *SubmodelRepositoryClient) GetNextSubmodelPage(cursor string, limit int) (*PagedResult[types.ISubmodel], error) {
+	targetURL := repoClient.baseURL.JoinPath(SubmodelRepositoryPath)
 
-	request, err := http.NewRequest(http.MethodGet, targetUrl.String(), nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to construct request: %w", err)
-	}
-
-	if len(cursor) > 0 {
-		request.Header.Add("cursor", cursor)
-	}
-
-	if limit > 0 {
-		request.Header.Add("limit", strconv.FormatInt(int64(limit), 10))
-	}
-
-	resp, err := repoClient.httpClient.Do(request)
+	pagedResult, err := DoPagedGetRequest(repoClient.httpClient, targetURL.String(), cursor, limit)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusOK {
-		// read page
-		var basyxResultRaw BasyxPagedResultRaw
-		if err := json.NewDecoder(resp.Body).Decode(&basyxResultRaw); err != nil {
-			return nil, fmt.Errorf("request returned %s but decoding failed: %w", resp.Status, err)
+	var typedResult PagedResult[types.ISubmodel]
+	typedResult.Metadata = pagedResult.Metadata
+	typedResult.Result = make([]types.ISubmodel, 0, len(pagedResult.Result))
+
+	for _, rawIn := range pagedResult.Result {
+		submodel, err := create.FromBytes(rawIn, jsonization.SubmodelFromJsonable)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse Shell: %w", err)
 		}
-
-		// copy metadata
-		var basyxResult BasyxPagedResult[types.ISubmodel]
-		basyxResult.Metadata = basyxResultRaw.Metadata
-		basyxResult.Result = make([]types.ISubmodel, 0, len(basyxResultRaw.Result))
-
-		// return early for empty or nil result
-		if len(basyxResultRaw.Result) == 0 {
-			return &basyxResult, nil
-		}
-
-		// convert raw messages to Submodel
-		for _, rawJsonInput := range basyxResultRaw.Result {
-			submodel, err := create.FromBytes(rawJsonInput, jsonization.SubmodelFromJsonable)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse AAS: %w", err)
-			}
-
-			basyxResult.Result = append(basyxResult.Result, submodel)
-		}
-
-		return &basyxResult, nil
-	} else {
-		// try to read errors
-		var errorResult BasyxErrorResult
-		if err := json.NewDecoder(resp.Body).Decode(&errorResult); err != nil {
-			return nil, fmt.Errorf("request failed with status %s but error could not be decoded: %w", resp.Status, err)
-		}
-
-		return nil, errorResult
+		typedResult.Result = append(typedResult.Result, submodel)
 	}
+
+	return &typedResult, nil
 }
 
 // ---------------------------------------- Submodels --------------------------------
 // GetSubmodelJsonable gets a submodel in the "jsonable" format (as map[string]any - fit for jsonization)
 func (repoClient *SubmodelRepositoryClient) GetSubmodelJsonable(submodelID string) (map[string]any, error) {
-	targetUrl, err := getEncodedTargetUrl(repoClient.baseURL, "/submodels", submodelID)
-	if err != nil {
-		return nil, err
-	}
-
-	body, err := DoGetRequest(repoClient.httpClient, targetUrl.String())
-	if err != nil {
-		return nil, fmt.Errorf("failed to get submodel: %w", err)
-	}
-	defer body.Close()
-
-	return bodyToJsonable(body)
+	return repoClient.derived(submodelID).GetJsonable()
 }
 
 // GetSubmodel returns a parsed submodel. errors if submodel cannot be parsed.
 func (repoClient *SubmodelRepositoryClient) GetSubmodel(submodelID string) (types.ISubmodel, error) {
-	submodelJsonable, err := repoClient.GetSubmodelJsonable(submodelID)
-	if err != nil {
-		return nil, err
-	}
-
-	submodel, err := jsonization.SubmodelFromJsonable(submodelJsonable)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse submodel json: %w", err)
-	}
-
-	return submodel, nil
+	return repoClient.derived(submodelID).Get()
 }
 
 // GetSubmodelMetadataJsonable gets the metadata representation of a submodel in jsonable form
 func (repoClient *SubmodelRepositoryClient) GetSubmodelMetadataJsonable(submodelID string) (map[string]any, error) {
-	targetUrl, err := getEncodedTargetUrl(repoClient.baseURL, "/submodels", submodelID, "/$metadata")
-	if err != nil {
-		return nil, err
-	}
-
-	body, err := DoGetRequest(repoClient.httpClient, targetUrl.String())
-	if err != nil {
-		return nil, fmt.Errorf("failed to get submodel metadata: %w", err)
-	}
-	defer body.Close()
-
-	return bodyToJsonable(body)
+	return repoClient.derived(submodelID).GetMetadataJsonable()
 }
 
 // GetSubmodelMetadata gets the metadata only representation of a submodel
 func (repoClient *SubmodelRepositoryClient) GetSubmodelMetadata(submodelID string) (types.ISubmodel, error) {
-	submodelJsonable, err := repoClient.GetSubmodelMetadataJsonable(submodelID)
-	if err != nil {
-		return nil, err
-	}
+	return repoClient.derived(submodelID).GetMetadata()
+}
 
-	submodel, err := jsonization.SubmodelFromJsonable(submodelJsonable)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse submodel metadata json: %w", err)
-	}
-
-	return submodel, nil
+// GetSubmodelValueOnly returns ValueOnly representation of submodel
+func (repoClient *SubmodelRepositoryClient) GetSubmodelValueOnly(submodelID string) ([]byte, error) {
+	return repoClient.derived(submodelID).GetValueOnly()
 }
 
 // UploadSubmodel uploads a submodel to the /submodels endpoint
@@ -206,7 +126,7 @@ func (repoClient *SubmodelRepositoryClient) UploadSubmodel(submodel types.ISubmo
 		return fmt.Errorf("failed to convert submodel to bytes: %w", err)
 	}
 
-	targetUrl := repoClient.baseURL.JoinPath("/submodels")
+	targetUrl := repoClient.baseURL.JoinPath(SubmodelRepositoryPath)
 
 	body, err := DoPostRequest(repoClient.httpClient, targetUrl.String(), submodelBytes)
 	if err != nil {
@@ -218,41 +138,18 @@ func (repoClient *SubmodelRepositoryClient) UploadSubmodel(submodel types.ISubmo
 }
 
 // UpdateSubmodel updates a submodel with PUT /submodels/:submodelID
-func (repoClient *SubmodelRepositoryClient) UpdateSubmodel(submodel types.ISubmodel) error {
-	if submodel == nil {
-		return fmt.Errorf("submodel cannot be nil")
-	}
-
-	submodelBytes, err := aasEntityToBytes(submodel)
-	if err != nil {
-		return fmt.Errorf("failed to convert submodel to bytes: %w", err)
-	}
-
-	targetUrl, err := getEncodedTargetUrl(repoClient.baseURL, "/submodels", submodel.ID())
-	if err != nil {
-		return err
-	}
-
-	body, err := DoPutRequest(repoClient.httpClient, targetUrl.String(), submodelBytes)
-	if err != nil {
-		return err
-	}
-	defer body.Close()
-
-	return nil
+func (repoClient *SubmodelRepositoryClient) UpdateSubmodel(submodelID string, submodel types.ISubmodel) error {
+	return repoClient.derived(submodelID).Update(submodel)
 }
 
-// DeleteSubmodel is a wrapper for DeleteSubmodelByID while using submodel.ID() as submodelID
-func (repoClient *SubmodelRepositoryClient) DeleteSubmodel(submodel types.ISubmodel) error {
-	if submodel == nil {
-		return fmt.Errorf("submodel cannot be nil")
-	}
-	return repoClient.DeleteSubmodelByID(submodel.ID())
+// UpdateSubmodelValueOnly updates a Submodel using ValueOnly mode
+func (repoClient *SubmodelRepositoryClient) UpdateSubmodelValueOnly(submodelID string, content []byte) error {
+	return repoClient.derived(submodelID).UpdateValueOnly(content)
 }
 
 // DeleteSubmodelByID deletes a submodel using DELETE /submodels/:submodelID
-func (repoClient *SubmodelRepositoryClient) DeleteSubmodelByID(submodelID string) error {
-	targetUrl, err := getEncodedTargetUrl(repoClient.baseURL, "/submodels", submodelID)
+func (repoClient *SubmodelRepositoryClient) DeleteSubmodel(submodelID string) error {
+	targetUrl, err := getEncodedTargetUrl(repoClient.baseURL, SubmodelRepositoryPath, submodelID)
 	if err != nil {
 		return err
 	}
@@ -267,137 +164,54 @@ func (repoClient *SubmodelRepositoryClient) DeleteSubmodelByID(submodelID string
 }
 
 // ---------------------------------------- Submodel Elements --------------------------------
+func (repoClient *SubmodelRepositoryClient) GetNextSubmodelElementsPage(submodelID string, cursor string, limit int) (*PagedResult[types.ISubmodelElement], error) {
+	return repoClient.derived(submodelID).GetNextSubmodelElementsPage(cursor, limit)
+}
+
 // GetSubmodelElementJsonable gets a submodel element from submodelID with idShortPath in the jsonable format
 func (repoClient *SubmodelRepositoryClient) GetSubmodelElementJsonable(submodelID string, idShortPath string) (map[string]any, error) {
-	targetUrl, err := getEncodedTargetUrl(repoClient.baseURL, "/submodels", submodelID, "/submodel-elements", idShortPath)
-	if err != nil {
-		return nil, err
-	}
-
-	body, err := DoGetRequest(repoClient.httpClient, targetUrl.String())
-	if err != nil {
-		return nil, fmt.Errorf("failed to get submodel element: %w", err)
-	}
-	defer body.Close()
-
-	return bodyToJsonable(body)
+	return repoClient.derived(submodelID).GetSubmodelElementJsonable(idShortPath)
 }
 
 // GetSubmodelElement returns a parse submodel element. errors if submodel element cannot be parsed.
 // Returns only a generic submodelElement. Use EnsureSubmodelElementType() on the result to get types
 func (repoClient *SubmodelRepositoryClient) GetSubmodelElement(submodelID string, idShortPath string) (types.ISubmodelElement, error) {
-	submodelElementJsonable, err := repoClient.GetSubmodelElementJsonable(submodelID, idShortPath)
-	if err != nil {
-		return nil, err
-	}
-
-	submodelElement, err := jsonization.SubmodelElementFromJsonable(submodelElementJsonable)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse submodel element json: %w", err)
-	}
-
-	return submodelElement, nil
+	return repoClient.derived(submodelID).GetSubmodelElement(idShortPath)
 }
 
 // GetSubmodelElementValue returns the valueOnly representation of a submodel element. returns only a string, no typed elements.
-func (repoClient *SubmodelRepositoryClient) GetSubmodelElementValue(submodelID string, idShortPath string) (string, error) {
-	targetUrl, err := getEncodedTargetUrl(repoClient.baseURL, "/submodels", submodelID, "/submodel-elements", idShortPath, "$value")
-	if err != nil {
-		return "", err
-	}
-
-	body, err := DoGetRequest(repoClient.httpClient, targetUrl.String())
-	if err != nil {
-		return "", fmt.Errorf("failed to get submodel element value: %w", err)
-	}
-	defer body.Close()
-
-	content, err := io.ReadAll(body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read body of submodel element value: %w", err)
-	}
-
-	return string(content), nil
+func (repoClient *SubmodelRepositoryClient) GetSubmodelElementValue(submodelID string, idShortPath string) ([]byte, error) {
+	return repoClient.derived(submodelID).GetSubmodelElementValueOnly(idShortPath)
 }
 
 // UploadSubmodelElement uploads a submodel with POST /submodels/:submodelID/submodel-elements/:idShortPath
 func (repoClient *SubmodelRepositoryClient) UploadSubmodelElement(submodelID string, idShortPath string, element types.ISubmodelElement) error {
-	if element == nil {
-		return fmt.Errorf("element cannot be nil")
-	}
-
-	submodelElementBytes, err := aasEntityToBytes(element)
-	if err != nil {
-		return fmt.Errorf("failed to convert submodel element to bytes: %w", err)
-	}
-
-	targetUrl, err := getEncodedTargetUrl(repoClient.baseURL, "/submodels", submodelID, "/submodel-elements", idShortPath)
-	if err != nil {
-		return err
-	}
-
-	body, err := DoPostRequest(repoClient.httpClient, targetUrl.String(), submodelElementBytes)
-	if err != nil {
-		return err
-	}
-	defer body.Close()
-
-	return nil
+	return repoClient.derived(submodelID).UploadSubmodelElement(idShortPath, element)
 }
 
 // UpdateSubmodelElement updates a submodel element with PUT /submodels/:submodelID/submodel-elements/:idShortPath
 func (repoClient *SubmodelRepositoryClient) UpdateSubmodelElement(submodelID string, idShortPath string, element types.ISubmodelElement) error {
-	if element == nil {
-		return fmt.Errorf("element cannot be nil")
-	}
-
-	submodelElementBytes, err := aasEntityToBytes(element)
-	if err != nil {
-		return fmt.Errorf("failed to convert submodel element to bytes: %w", err)
-	}
-
-	targetUrl, err := getEncodedTargetUrl(repoClient.baseURL, "/submodels", submodelID, "/submodel-elements", idShortPath)
-	if err != nil {
-		return err
-	}
-
-	body, err := DoPutRequest(repoClient.httpClient, targetUrl.String(), submodelElementBytes)
-	if err != nil {
-		return err
-	}
-	defer body.Close()
-
-	return nil
+	return repoClient.derived(submodelID).UpdateSubmodelElement(idShortPath, element)
 }
 
 // UpdateSubmodelElementValue updates the value of a submodel element using PATCH /submodels/:submodelID/submodel-elements/:idShortPath/$value
-func (repoClient *SubmodelRepositoryClient) UpdateSubmodelElementValue(submodelID string, idShortPath string, content []byte) error {
-	targetUrl, err := getEncodedTargetUrl(repoClient.baseURL, "/submodels", submodelID, "/submodel-elements", idShortPath, "$value")
-	if err != nil {
-		return err
-	}
-
-	body, err := DoPatchRequest(repoClient.httpClient, targetUrl.String(), content)
-	if err != nil {
-		return err
-	}
-	defer body.Close()
-
-	return nil
+func (repoClient *SubmodelRepositoryClient) UpdateSubmodelElementValueOnly(submodelID string, idShortPath string, content []byte) error {
+	return repoClient.derived(submodelID).UpdateSubmodelElementValueOnly(idShortPath, content)
 }
 
 // DeleteSubmodelElement removes a submodel element with DELETE /submodels/:submodelID/submodel-elements/:idShortPath
 func (repoClient *SubmodelRepositoryClient) DeleteSubmodelElement(submodelID string, idShortPath string) error {
-	targetUrl, err := getEncodedTargetUrl(repoClient.baseURL, "/submodels", submodelID, "/submodel-elements", idShortPath)
-	if err != nil {
-		return err
-	}
+	return repoClient.derived(submodelID).DeleteSubmodelElement(idShortPath)
+}
 
-	body, err := DoDeleteRequest(repoClient.httpClient, targetUrl.String())
-	if err != nil {
-		return err
-	}
-	defer body.Close()
+// InvokeOperation invokes a synchronous operation on idShortPath using operationRequest as input
+func (repoClient *SubmodelRepositoryClient) InvokeOperation(submodelID string, idShortPath string, operationRequest *OperationRequest) (*OperationResult, error) {
+	return repoClient.derived(submodelID).InvokeOperation(idShortPath, operationRequest)
+}
 
-	return nil
+// --------------------- Util ------------------------
+func (repoClient *SubmodelRepositoryClient) derived(submodelID string) *SubmodelServiceClient {
+	encodedSubmodelID := toBase64URL(submodelID)
+	targetURL := repoClient.baseURL.JoinPath(SubmodelRepositoryPath, encodedSubmodelID)
+	return NewDerivedSubmodelServiceClient(repoClient.httpClient, targetURL)
 }

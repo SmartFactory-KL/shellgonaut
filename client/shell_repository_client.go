@@ -1,18 +1,17 @@
 package client
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
-	"strconv"
-	"time"
 
 	"github.com/SmartFactory-KL/shellgonaut/create"
 	"github.com/aas-core-works/aas-core3.1-golang/jsonization"
 	"github.com/aas-core-works/aas-core3.1-golang/types"
 )
+
+const ShellRepositoryPath = "/shells"
 
 type ShellRepositoryClient struct {
 	httpClient *http.Client
@@ -20,24 +19,20 @@ type ShellRepositoryClient struct {
 }
 
 // NewShellRepositoryClient creates a new Shell Repository Client while validating the baseURL
-func NewShellRepositoryClient(baseURL string) (*ShellRepositoryClient, error) {
-	shellRepoBaseURL, err := EnsureUrlWithoutSuffixOrSlash(baseURL, "/shells")
+func NewShellRepositoryClient(baseURL string, opts ...ClientOption) (*ShellRepositoryClient, error) {
+	shellRepoBaseURL, err := EnsureUrlWithoutSuffixOrSlash(baseURL, ShellRepositoryPath)
 	if err != nil {
 		return nil, fmt.Errorf("invalid url for shell repository: %w", err)
 	}
 
-	client := &ShellRepositoryClient{
-		httpClient: &http.Client{
-			Timeout: time.Second * 10,
-			Transport: &http.Transport{
-				MaxIdleConns:        100,
-				MaxIdleConnsPerHost: 20,
-				IdleConnTimeout:     90 * time.Second,
-				TLSHandshakeTimeout: 5 * time.Second,
-			},
-		},
+	httpClient, err := createHttpClientFromOptions(opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create http client: %w", err)
+	}
 
-		baseURL: shellRepoBaseURL,
+	client := &ShellRepositoryClient{
+		httpClient: httpClient,
+		baseURL:    shellRepoBaseURL,
 	}
 
 	return client, nil
@@ -71,97 +66,38 @@ func (repoClient *ShellRepositoryClient) GetShellRepositoryDescription() ([]byte
 // ---------------------------------------- Shell Pages ----------------------------
 // GetNextShellPage requests the next page starting from cursor. empty cursor starts from the beginning, limit = 0 means no limit
 // however: basyx usually has a limit anyway.
-func (repoClient *ShellRepositoryClient) GetNextShellPage(cursor string, limit int) (*BasyxPagedResult[types.IAssetAdministrationShell], error) {
-	targetUrl := repoClient.baseURL.JoinPath("/shells")
+func (repoClient *ShellRepositoryClient) GetNextShellPage(cursor string, limit int) (*PagedResult[types.IAssetAdministrationShell], error) {
+	targetURL := repoClient.baseURL.JoinPath(ShellRepositoryPath)
 
-	request, err := http.NewRequest(http.MethodGet, targetUrl.String(), nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to construct request: %w", err)
-	}
-
-	if len(cursor) > 0 {
-		request.Header.Add("cursor", cursor)
-	}
-
-	if limit > 0 {
-		request.Header.Add("limit", strconv.FormatInt(int64(limit), 10))
-	}
-
-	resp, err := repoClient.httpClient.Do(request)
+	pagedResult, err := DoPagedGetRequest(repoClient.httpClient, targetURL.String(), cursor, limit)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusOK {
-		// read page
-		var basyxResultRaw BasyxPagedResultRaw
-		if err := json.NewDecoder(resp.Body).Decode(&basyxResultRaw); err != nil {
-			return nil, fmt.Errorf("request returned %s but decoding failed: %w", resp.Status, err)
+	var typedResult PagedResult[types.IAssetAdministrationShell]
+	typedResult.Metadata = pagedResult.Metadata
+	typedResult.Result = make([]types.IAssetAdministrationShell, 0, len(pagedResult.Result))
+
+	for _, rawIn := range pagedResult.Result {
+		shell, err := create.FromBytes(rawIn, jsonization.AssetAdministrationShellFromJsonable)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse Shell: %w", err)
 		}
-
-		// copy metadata
-		var basyxResult BasyxPagedResult[types.IAssetAdministrationShell]
-		basyxResult.Metadata = basyxResultRaw.Metadata
-		basyxResult.Result = make([]types.IAssetAdministrationShell, 0, len(basyxResultRaw.Result))
-
-		// return early for empty or nil result
-		if len(basyxResultRaw.Result) == 0 {
-			return &basyxResult, nil
-		}
-
-		// convert raw messages to AAS
-		for _, rawJsonInput := range basyxResultRaw.Result {
-			shell, err := create.FromBytes(rawJsonInput, jsonization.AssetAdministrationShellFromJsonable)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse AAS: %w", err)
-			}
-
-			basyxResult.Result = append(basyxResult.Result, shell)
-		}
-
-		return &basyxResult, nil
-	} else {
-		// try to read errors
-		var errorResult BasyxErrorResult
-		if err := json.NewDecoder(resp.Body).Decode(&errorResult); err != nil {
-			return nil, fmt.Errorf("request failed with status %s but error could not be decoded: %w", resp.Status, err)
-		}
-
-		return nil, errorResult
+		typedResult.Result = append(typedResult.Result, shell)
 	}
+
+	return &typedResult, nil
 }
 
 // ---------------------------------------- Shells  --------------------------------
 // GetSubmodelJsonable gets a shell in the "jsonable" format (as map[string]any - fit for jsonization)
 func (repoClient *ShellRepositoryClient) GetShellJsonable(shellID string) (map[string]any, error) {
-	targetUrl, err := getEncodedTargetUrl(repoClient.baseURL, "/shells", shellID)
-	if err != nil {
-		return nil, err
-	}
-
-	body, err := DoGetRequest(repoClient.httpClient, targetUrl.String())
-	if err != nil {
-		return nil, fmt.Errorf("failed to get shell: %w", err)
-	}
-	defer body.Close()
-
-	return bodyToJsonable(body)
+	return repoClient.derived(shellID).GetJsonable()
 }
 
 // GetShell returns a parsed asset administration shell. errors if shell cannot be parsed
 func (repoClient *ShellRepositoryClient) GetShell(shellID string) (types.IAssetAdministrationShell, error) {
-	shellJsonable, err := repoClient.GetShellJsonable(shellID)
-	if err != nil {
-		return nil, err
-	}
-
-	shell, err := jsonization.AssetAdministrationShellFromJsonable(shellJsonable)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse shell json: %w", err)
-	}
-
-	return shell, nil
+	return repoClient.derived(shellID).Get()
 }
 
 // UploadShell uploads a shell to the /shells endpoint
@@ -175,7 +111,7 @@ func (repoClient *ShellRepositoryClient) UploadShell(shell types.IAssetAdministr
 		return fmt.Errorf("failed to convert shell to bytes: %w", err)
 	}
 
-	targetUrl := repoClient.baseURL.JoinPath("/shells")
+	targetUrl := repoClient.baseURL.JoinPath(ShellRepositoryPath)
 
 	body, err := DoPostRequest(repoClient.httpClient, targetUrl.String(), shellBytes)
 	if err != nil {
@@ -187,42 +123,13 @@ func (repoClient *ShellRepositoryClient) UploadShell(shell types.IAssetAdministr
 }
 
 // UpdateShell updates a shell with PUT /shells/:shellID
-func (repoClient *ShellRepositoryClient) UpdateShell(shell types.IAssetAdministrationShell) error {
-	if shell == nil {
-		return fmt.Errorf("shell cannot be nil")
-	}
-
-	shellBytes, err := aasEntityToBytes(shell)
-	if err != nil {
-		return fmt.Errorf("failed to convert shell to bytes: %w", err)
-	}
-
-	targetUrl, err := getEncodedTargetUrl(repoClient.baseURL, "/shells", shell.ID())
-	if err != nil {
-		return err
-	}
-
-	body, err := DoPutRequest(repoClient.httpClient, targetUrl.String(), shellBytes)
-	if err != nil {
-		return err
-	}
-	defer body.Close()
-
-	return nil
-}
-
-// DeleteShell is a wrapper for DeleteShellByID while using shell.ID() as shellID
-func (repoClient *ShellRepositoryClient) DeleteShell(shell types.IAssetAdministrationShell) error {
-	if shell == nil {
-		return fmt.Errorf("shell cannot be nil")
-	}
-
-	return repoClient.DeleteShellByID(shell.ID())
+func (repoClient *ShellRepositoryClient) UpdateShell(shellID string, shell types.IAssetAdministrationShell) error {
+	return repoClient.derived(shellID).Update(shell)
 }
 
 // DeleteShellByID deletes a shell using DELETE /shells/:shellID
-func (repoClient *ShellRepositoryClient) DeleteShellByID(shellID string) error {
-	targetUrl, err := getEncodedTargetUrl(repoClient.baseURL, "/shells", shellID)
+func (repoClient *ShellRepositoryClient) DeleteShell(shellID string) error {
+	targetUrl, err := getEncodedTargetUrl(repoClient.baseURL, ShellRepositoryPath, shellID)
 	if err != nil {
 		return err
 	}
@@ -236,86 +143,24 @@ func (repoClient *ShellRepositoryClient) DeleteShellByID(shellID string) error {
 	return nil
 }
 
-// GetShellSubmodelReferencesJsonable calls the /submodel-refs endpoint and returns a list of jsonables for a shell
-func (repoClient *ShellRepositoryClient) GetShellSubmodelReferencesJsonable(shellID string) ([]map[string]any, error) {
-	targetUrl, err := getEncodedTargetUrl(repoClient.baseURL, "/shells", shellID, "/submodel-refs")
-	if err != nil {
-		return nil, err
-	}
-
-	body, err := DoGetRequest(repoClient.httpClient, targetUrl.String())
-	if err != nil {
-		return nil, fmt.Errorf("failed to get shell: %w", err)
-	}
-	defer body.Close()
-
-	return bodyToJsonableList(body)
-}
-
-// GetShellSubmodelReferences calls the /submodel-refs endpoint but converts the received jsonables to []types.IReference
-// fails if any reference is non-jsonizable
-func (repoClient *ShellRepositoryClient) GetShellSubmodelReferences(shellID string) ([]types.IReference, error) {
-	referenceJsonableList, err := repoClient.GetShellSubmodelReferencesJsonable(shellID)
-	if err != nil {
-		return nil, err
-	}
-
-	list := []types.IReference{}
-
-	for idx, entry := range referenceJsonableList {
-		reference, err := jsonization.ReferenceFromJsonable(entry)
-		if err != nil {
-			return nil, fmt.Errorf("submodel reference #%d of shellID %s failed to jsonize: %w", idx, shellID, err)
-		}
-		list = append(list, reference)
-	}
-
-	return list, nil
+// GetNextSubmodelReferencePage gets the next page of submodel references for shell
+func (repoClient *ShellRepositoryClient) GetNextSubmodelReferencePage(shellID string, cursor string, limit int) (*PagedResult[types.IReference], error) {
+	return repoClient.derived(shellID).GetNextSubmodelReferencePage(cursor, limit)
 }
 
 // UploadShellSubmodelReference creates a Reference for the given submodel and uploads it to POST  /shells/:shellID/submodel-refs
-func (repoClient *ShellRepositoryClient) UploadShellSubmodelReference(shellID string, submodel types.ISubmodel) error {
-	if submodel == nil {
-		return fmt.Errorf("submodel cannot be nil")
-	}
-
-	submodelReference, err := createReferenceForSubmodel(submodel)
-	if err != nil {
-		return fmt.Errorf("failed to create submodel reference for submodel: %w", err)
-	}
-
-	referenceBytes, err := aasEntityToBytes(submodelReference)
-	if err != nil {
-		return fmt.Errorf("failed to convert submodel reference to bytes: %w", err)
-	}
-
-	targetUrl, err := getEncodedTargetUrl(repoClient.baseURL, "/shells", shellID, "/submodel-refs")
-	if err != nil {
-		return err
-	}
-
-	body, err := DoPostRequest(repoClient.httpClient, targetUrl.String(), referenceBytes)
-	if err != nil {
-		return err
-	}
-	defer body.Close()
-
-	return nil
+func (repoClient *ShellRepositoryClient) UploadShellSubmodelReference(shellID string, submodelReference types.IReference) error {
+	return repoClient.derived(shellID).UploadSubmodelReference(submodelReference)
 }
 
 // DeleteShellSubmodelReference removes a single reference via DELETE /shells/:shellID/submodel-refs/:submodelID
 func (repoClient *ShellRepositoryClient) DeleteShellSubmodelReference(shellID string, submodelID string) error {
-	encodedSubmodelID := toBase64URL(submodelID)
-	targetUrl, err := getEncodedTargetUrl(repoClient.baseURL, "/shells", shellID, "/submodel-refs", encodedSubmodelID)
-	if err != nil {
-		return err
-	}
+	return repoClient.derived(shellID).DeleteSubmodelReference(submodelID)
+}
 
-	body, err := DoDeleteRequest(repoClient.httpClient, targetUrl.String())
-	if err != nil {
-		return err
-	}
-	defer body.Close()
-
-	return nil
+// --------------------- Util ------------------------
+func (repoClient *ShellRepositoryClient) derived(shellID string) *ShellServiceClient {
+	encodedShellID := toBase64URL(shellID)
+	targetURL := repoClient.baseURL.JoinPath(ShellRepositoryPath, encodedShellID)
+	return NewDerivedShellServiceClient(repoClient.httpClient, targetURL)
 }

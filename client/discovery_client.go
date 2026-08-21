@@ -6,35 +6,32 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"time"
 
 	"github.com/aas-core-works/aas-core3.1-golang/jsonization"
 	"github.com/aas-core-works/aas-core3.1-golang/types"
 )
+
+const DiscoveryPath = "/lookup/shells"
 
 type DiscoveryClient struct {
 	httpClient *http.Client
 	baseURL    *url.URL
 }
 
-func NewDiscoveryClient(baseURL string) (*DiscoveryClient, error) {
-	discoveryBaseURL, err := EnsureUrlWithoutSuffixOrSlash(baseURL, "/lookup/shells")
+func NewDiscoveryClient(baseURL string, opts ...ClientOption) (*DiscoveryClient, error) {
+	discoveryBaseURL, err := EnsureUrlWithoutSuffixOrSlash(baseURL, DiscoveryPath)
 	if err != nil {
 		return nil, fmt.Errorf("invalid url for discovery: %w", err)
 	}
 
-	client := &DiscoveryClient{
-		httpClient: &http.Client{
-			Timeout: time.Second * 10,
-			Transport: &http.Transport{
-				MaxIdleConns:        100,
-				MaxIdleConnsPerHost: 20,
-				IdleConnTimeout:     90 * time.Second,
-				TLSHandshakeTimeout: 5 * time.Second,
-			},
-		},
+	httpClient, err := createHttpClientFromOptions(opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create http client: %w", err)
+	}
 
-		baseURL: discoveryBaseURL,
+	client := &DiscoveryClient{
+		httpClient: httpClient,
+		baseURL:    discoveryBaseURL,
 	}
 
 	return client, nil
@@ -67,8 +64,43 @@ func (discClient *DiscoveryClient) GetDiscoveryDescription() ([]byte, error) {
 
 // ---------------------------------------- Lookup ----------------------------------
 
-func (discClient *DiscoveryClient) GetShellIDList(assetID []types.ISpecificAssetID) {
-	// seems to be paginated
+func (discClient *DiscoveryClient) GetNextLookupPage(assetID []types.ISpecificAssetID, cursor string, limit int) (*PagedStringResult, error) {
+	targetURL := discClient.baseURL.JoinPath(DiscoveryPath)
+
+	assetBytes, err := aasEntityListToBytes(assetID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert assetIDs to bytes: %w", err)
+	}
+
+	encodedAssetBytes := toBase64URL(string(assetBytes))
+
+	pagedResult, err := DoPagedGetRequest(
+		discClient.httpClient,
+		targetURL.String(),
+		cursor,
+		limit,
+		AdditionalHeader{
+			Key:   "assetIds",
+			Value: encodedAssetBytes,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+
+	var stringResult PagedStringResult
+	stringResult.Metadata = pagedResult.Metadata
+	stringResult.Result = make([]string, 0, len(pagedResult.Result))
+
+	for _, rawIn := range pagedResult.Result {
+		var strInput string
+		if err := json.Unmarshal(rawIn, &strInput); err != nil {
+			return nil, fmt.Errorf("failed to parse list of shell IDs: %w", err)
+		}
+		stringResult.Result = append(stringResult.Result, strInput)
+	}
+
+	return &stringResult, nil
 }
 
 // ---------------------------------------- ShellID -> AssetID ----------------------
