@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/SmartFactory-KL/shellgonaut/create"
 	"github.com/aas-core-works/aas-core3.1-golang/jsonization"
 	"github.com/aas-core-works/aas-core3.1-golang/types"
+	"github.com/smartfactory-kl/shellgonaut/convert"
 )
 
 type ShellServiceClient struct {
@@ -88,7 +88,7 @@ func (serviceClient *ShellServiceClient) GetJsonable() (map[string]any, error) {
 	}
 	defer body.Close()
 
-	return bodyToJsonable(body)
+	return convert.BodyToJsonable(body)
 }
 
 // Get returns the parsed shell
@@ -112,7 +112,7 @@ func (serviceClient *ShellServiceClient) Update(shell types.IAssetAdministration
 		return fmt.Errorf("shell cannot be nil")
 	}
 
-	shellBytes, err := aasEntityToBytes(shell)
+	shellBytes, err := convert.JsonableTypeToBytes(shell)
 	if err != nil {
 		return fmt.Errorf("failed to convert shell to bytes: %w", err)
 	}
@@ -139,7 +139,7 @@ func (serviceClient *ShellServiceClient) GetAssetInformation() (types.IAssetInfo
 	}
 	defer body.Close()
 
-	assetInfoJsonable, err := bodyToJsonable(body)
+	assetInfoJsonable, err := convert.BodyToJsonable(body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read asset information json: %w", err)
 	}
@@ -158,7 +158,7 @@ func (serviceClient *ShellServiceClient) UpdateAssetInformation(assetInfo types.
 		return fmt.Errorf("asset information cannot be nil")
 	}
 
-	shellBytes, err := aasEntityToBytes(assetInfo)
+	shellBytes, err := convert.JsonableTypeToBytes(assetInfo)
 	if err != nil {
 		return fmt.Errorf("failed to convert asset information to bytes: %w", err)
 	}
@@ -190,7 +190,7 @@ func (serviceClient *ShellServiceClient) GetNextSubmodelReferencePage(cursor str
 	typedResult.Result = make([]types.IReference, 0, len(pagedResult.Result))
 
 	for _, rawIn := range pagedResult.Result {
-		submodelReference, err := create.FromBytes(rawIn, jsonization.ReferenceFromJsonable)
+		submodelReference, err := convert.JsonableTypeFromBytes(rawIn, jsonization.ReferenceFromJsonable)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse Submodel Reference: %w", err)
 		}
@@ -206,7 +206,7 @@ func (serviceClient *ShellServiceClient) UploadSubmodelReference(reference types
 		return fmt.Errorf("reference cannot be nil")
 	}
 
-	referenceBytes, err := aasEntityToBytes(reference)
+	referenceBytes, err := convert.JsonableTypeToBytes(reference)
 	if err != nil {
 		return fmt.Errorf("failed to convert reference to bytes: %w", err)
 	}

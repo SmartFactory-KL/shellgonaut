@@ -1,152 +1,154 @@
 package descriptor
 
-import (
-	"errors"
-	"fmt"
+// UPDATE: For the first repo only release not needed, therefore not active
 
-	"github.com/aas-core-works/aas-core3.1-golang/jsonization"
-	"github.com/aas-core-works/aas-core3.1-golang/reporting"
-	"github.com/aas-core-works/aas-core3.1-golang/types"
-)
+// import (
+// 	"errors"
+// 	"fmt"
 
-func stringFromJsonable(jsonable any) (string, error) {
-	return simpletonFromJsonable(jsonable, "string", "")
-}
+// 	"github.com/aas-core-works/aas-core3.1-golang/jsonization"
+// 	"github.com/aas-core-works/aas-core3.1-golang/reporting"
+// 	"github.com/aas-core-works/aas-core3.1-golang/types"
+// )
 
-func boolFromJsonable(jsonable any) (bool, error) {
-	return simpletonFromJsonable(jsonable, "bool", false)
-}
+// func stringFromJsonable(jsonable any) (string, error) {
+// 	return simpletonFromJsonable(jsonable, "string", "")
+// }
 
-func float64FromJsonable(jsonable any) (float64, error) {
-	return simpletonFromJsonable(jsonable, "number", 0.0)
-}
+// func boolFromJsonable(jsonable any) (bool, error) {
+// 	return simpletonFromJsonable(jsonable, "bool", false)
+// }
 
-func simpletonFromJsonable[T any](jsonable any, expected string, zero T) (T, error) {
-	if jsonable == nil {
-		return zero, newDeserializationError(
-			fmt.Sprintf("expected %s, but got nil", expected),
-		)
-	}
+// func float64FromJsonable(jsonable any) (float64, error) {
+// 	return simpletonFromJsonable(jsonable, "number", 0.0)
+// }
 
-	result, ok := jsonable.(T)
-	if ok {
-		return result, nil
-	}
+// func simpletonFromJsonable[T any](jsonable any, expected string, zero T) (T, error) {
+// 	if jsonable == nil {
+// 		return zero, newDeserializationError(
+// 			fmt.Sprintf("expected %s, but got nil", expected),
+// 		)
+// 	}
 
-	return zero, newDeserializationError(
-		fmt.Sprintf("expected %s, but got %T", expected, jsonable),
-	)
-}
+// 	result, ok := jsonable.(T)
+// 	if ok {
+// 		return result, nil
+// 	}
 
-func simpletonListFromJsonable[T any](jsonable any, expected string, zero T) ([]T, error) {
-	if jsonable == nil {
-		return []T{}, newDeserializationError(
-			fmt.Sprintf("expected list of %s, but got nil", expected),
-		)
-	}
+// 	return zero, newDeserializationError(
+// 		fmt.Sprintf("expected %s, but got %T", expected, jsonable),
+// 	)
+// }
 
-	arr, ok := jsonable.([]any)
-	if !ok {
-		return []T{}, newDeserializationError(
-			fmt.Sprintf("expeceted list of %s, but got %T instead", expected, jsonable),
-		)
-	}
+// func simpletonListFromJsonable[T any](jsonable any, expected string, zero T) ([]T, error) {
+// 	if jsonable == nil {
+// 		return []T{}, newDeserializationError(
+// 			fmt.Sprintf("expected list of %s, but got nil", expected),
+// 		)
+// 	}
 
-	if len(arr) == 0 {
-		return []T{}, nil
-	}
+// 	arr, ok := jsonable.([]any)
+// 	if !ok {
+// 		return []T{}, newDeserializationError(
+// 			fmt.Sprintf("expeceted list of %s, but got %T instead", expected, jsonable),
+// 		)
+// 	}
 
-	var result []T
-	for idx, arrItem := range arr {
-		val, err := simpletonFromJsonable(arrItem, expected, zero)
-		if err != nil {
-			return []T{}, newDeserializationError(
-				fmt.Sprintf("item #%s in array expected as %s but parsing failed: %w", idx, expected, err),
-			)
-		}
-		result = append(result, val)
-	}
+// 	if len(arr) == 0 {
+// 		return []T{}, nil
+// 	}
 
-	return result, nil
-}
+// 	var result []T
+// 	for idx, arrItem := range arr {
+// 		val, err := simpletonFromJsonable(arrItem, expected, zero)
+// 		if err != nil {
+// 			return []T{}, newDeserializationError(
+// 				fmt.Sprintf("item #%s in array expected as %s but parsing failed: %w", idx, expected, err),
+// 			)
+// 		}
+// 		result = append(result, val)
+// 	}
 
-func jsonizationFromJsonable[T types.IClass](jsonable any, jsonizationFunction func(any) (T, error)) (T, error) {
-	var zero T
+// 	return result, nil
+// }
 
-	if jsonable == nil {
-		return zero, newDeserializationError("expected json object, but got nil")
-	}
+// func jsonizationFromJsonable[T types.IClass](jsonable any, jsonizationFunction func(any) (T, error)) (T, error) {
+// 	var zero T
 
-	jsonMap, ok := jsonable.(map[string]any)
-	if !ok {
-		return zero, newDeserializationError(
-			fmt.Sprintf("expected json object, but got %T instead", jsonable),
-		)
-	}
+// 	if jsonable == nil {
+// 		return zero, newDeserializationError("expected json object, but got nil")
+// 	}
 
-	item, err := jsonizationFunction(jsonMap)
-	if err != nil {
-		return zero, newDeserializationError(
-			fmt.Sprintf("failed to parse: %w", err),
-		)
-	}
+// 	jsonMap, ok := jsonable.(map[string]any)
+// 	if !ok {
+// 		return zero, newDeserializationError(
+// 			fmt.Sprintf("expected json object, but got %T instead", jsonable),
+// 		)
+// 	}
 
-	return item, nil
-}
+// 	item, err := jsonizationFunction(jsonMap)
+// 	if err != nil {
+// 		return zero, newDeserializationError(
+// 			fmt.Sprintf("failed to parse: %w", err),
+// 		)
+// 	}
 
-func jsonizationFromJsonableList[T types.IClass](jsonable any, jsonizationFunction func(any) (T, error)) ([]T, error) {
-	if jsonable == nil {
-		return []T{}, newDeserializationError("expected list but got nil")
-	}
+// 	return item, nil
+// }
 
-	arr, ok := jsonable.([]map[string]any)
-	if !ok {
-		return []T{}, newDeserializationError(
-			fmt.Sprintf("expeceted list, but got %T instead", jsonable),
-		)
-	}
+// func jsonizationFromJsonableList[T types.IClass](jsonable any, jsonizationFunction func(any) (T, error)) ([]T, error) {
+// 	if jsonable == nil {
+// 		return []T{}, newDeserializationError("expected list but got nil")
+// 	}
 
-	if len(arr) == 0 {
-		return []T{}, nil
-	}
+// 	arr, ok := jsonable.([]map[string]any)
+// 	if !ok {
+// 		return []T{}, newDeserializationError(
+// 			fmt.Sprintf("expeceted list, but got %T instead", jsonable),
+// 		)
+// 	}
 
-	var result []T
-	for idx, arrItem := range arr {
-		val, err := jsonizationFromJsonable(arrItem, jsonizationFunction)
-		if err != nil {
-			return []T{}, newDeserializationError(
-				fmt.Sprintf("item #%s in array parsing failed: %w", idx, err),
-			)
-		}
-		result = append(result, val)
-	}
+// 	if len(arr) == 0 {
+// 		return []T{}, nil
+// 	}
 
-	return result, nil
-}
+// 	var result []T
+// 	for idx, arrItem := range arr {
+// 		val, err := jsonizationFromJsonable(arrItem, jsonizationFunction)
+// 		if err != nil {
+// 			return []T{}, newDeserializationError(
+// 				fmt.Sprintf("item #%s in array parsing failed: %w", idx, err),
+// 			)
+// 		}
+// 		result = append(result, val)
+// 	}
 
-func prependName(err error, name string) error {
-	var de *jsonization.DeserializationError
-	if errors.As(err, &de) {
-		de.Path.PrependName(&reporting.NameSegment{Name: name})
-	}
-	return err
-}
+// 	return result, nil
+// }
 
-func isValidJsonable(input any) (map[string]any, error) {
-	if input == nil {
-		return nil, newDeserializationError("expected a JSON object, but got null")
-	}
+// func prependName(err error, name string) error {
+// 	var de *jsonization.DeserializationError
+// 	if errors.As(err, &de) {
+// 		de.Path.PrependName(&reporting.NameSegment{Name: name})
+// 	}
+// 	return err
+// }
 
-	m, ok := input.(map[string]any)
-	if !ok {
-		err := newDeserializationError(
-			fmt.Sprintf(
-				"Expected a JSON object, but got %T",
-				input,
-			),
-		)
-		return nil, err
-	}
+// func isValidJsonable(input any) (map[string]any, error) {
+// 	if input == nil {
+// 		return nil, newDeserializationError("expected a JSON object, but got null")
+// 	}
 
-	return m, nil
-}
+// 	m, ok := input.(map[string]any)
+// 	if !ok {
+// 		err := newDeserializationError(
+// 			fmt.Sprintf(
+// 				"Expected a JSON object, but got %T",
+// 				input,
+// 			),
+// 		)
+// 		return nil, err
+// 	}
+
+// 	return m, nil
+// }

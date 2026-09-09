@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/SmartFactory-KL/shellgonaut/create"
 	"github.com/aas-core-works/aas-core3.1-golang/jsonization"
 	"github.com/aas-core-works/aas-core3.1-golang/types"
+	"github.com/smartfactory-kl/shellgonaut/convert"
 )
 
 type SubmodelServiceClient struct {
@@ -89,7 +89,7 @@ func (serviceClient *SubmodelServiceClient) GetJsonable() (map[string]any, error
 	}
 	defer body.Close()
 
-	return bodyToJsonable(body)
+	return convert.BodyToJsonable(body)
 }
 
 // Get returns the parsed Submodel
@@ -117,7 +117,7 @@ func (serviceClient *SubmodelServiceClient) GetMetadataJsonable() (map[string]an
 	}
 	defer body.Close()
 
-	return bodyToJsonable(body)
+	return convert.BodyToJsonable(body)
 }
 
 // GetMetadata gets the metadata only representation of a submodel
@@ -178,7 +178,7 @@ func (serviceClient *SubmodelServiceClient) Update(submodel types.ISubmodel) err
 		return fmt.Errorf("submodel cannot be nil")
 	}
 
-	submodelBytes, err := aasEntityToBytes(submodel)
+	submodelBytes, err := convert.JsonableTypeToBytes(submodel)
 	if err != nil {
 		return fmt.Errorf("failed to convert submodel to bytes: %w", err)
 	}
@@ -210,7 +210,7 @@ func (serviceClient *SubmodelServiceClient) GetNextSubmodelElementsPage(cursor s
 	typedResult.Result = make([]types.ISubmodelElement, 0, len(pagedResult.Result))
 
 	for _, rawIn := range pagedResult.Result {
-		submodelElement, err := create.FromBytes(rawIn, jsonization.SubmodelElementFromJsonable)
+		submodelElement, err := convert.JsonableTypeFromBytes(rawIn, jsonization.SubmodelElementFromJsonable)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse SubmodelElement: %w", err)
 		}
@@ -230,7 +230,7 @@ func (serviceClient *SubmodelServiceClient) GetSubmodelElementJsonable(idShortPa
 	}
 	defer body.Close()
 
-	return bodyToJsonable(body)
+	return convert.BodyToJsonable(body)
 }
 
 // GetSubmodelElement gets a submodel element at idShortPath
@@ -272,7 +272,7 @@ func (serviceClient *SubmodelServiceClient) UploadSubmodelElement(idShortPath st
 		return fmt.Errorf("SubmodelElement cannot be nil")
 	}
 
-	submodelElementBytes, err := aasEntityToBytes(submodelElement)
+	submodelElementBytes, err := convert.JsonableTypeToBytes(submodelElement)
 	if err != nil {
 		return fmt.Errorf("failed to convert SubmodelElement to bytes: %w", err)
 	}
@@ -300,7 +300,7 @@ func (serviceClient *SubmodelServiceClient) UpdateSubmodelElement(idShortPath st
 		return fmt.Errorf("SubmodelElement cannot be nil")
 	}
 
-	submodelElementBytes, err := aasEntityToBytes(submodelElement)
+	submodelElementBytes, err := convert.JsonableTypeToBytes(submodelElement)
 	if err != nil {
 		return fmt.Errorf("failed to convert SubmodelElement to bytes: %w", err)
 	}
@@ -365,12 +365,12 @@ func (serviceClient *SubmodelServiceClient) InvokeOperation(idShortPath string, 
 	// therefore not within jsonization - but its elements are.
 	jsonRequest := OperationRequestJSON{}
 
-	inputArguments, err := aasEntityListToJsonRaw(operationRequest.InputArguments)
+	inputArguments, err := convert.JsonableTypeListToRawJsonMessages(operationRequest.InputArguments)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse inputArguments: %w", err)
 	}
 
-	inoutputArguments, err := aasEntityListToJsonRaw(operationRequest.InoutputArguments)
+	inoutputArguments, err := convert.JsonableTypeListToRawJsonMessages(operationRequest.InoutputArguments)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse inoutputArguments: %w", err)
 	}
@@ -399,12 +399,12 @@ func (serviceClient *SubmodelServiceClient) InvokeOperation(idShortPath string, 
 		Success: operationResultJSON.Success,
 	}
 
-	operationResult.OutputArguments, err = create.ListFromJsonRawMessages(operationResultJSON.OutputArguments, jsonization.OperationVariableFromJsonable)
+	operationResult.OutputArguments, err = convert.JsonableTypeListFromRawJsonMessages(operationResultJSON.OutputArguments, jsonization.OperationVariableFromJsonable)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode result output arguments: %w", err)
 	}
 
-	operationResult.InoutputArguments, err = create.ListFromJsonRawMessages(operationResultJSON.InoutputArguments, jsonization.OperationVariableFromJsonable)
+	operationResult.InoutputArguments, err = convert.JsonableTypeListFromRawJsonMessages(operationResultJSON.InoutputArguments, jsonization.OperationVariableFromJsonable)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode result inoutput arguments: %w", err)
 	}

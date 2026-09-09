@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/SmartFactory-KL/shellgonaut/create"
 	"github.com/aas-core-works/aas-core3.1-golang/jsonization"
 	"github.com/aas-core-works/aas-core3.1-golang/types"
+	"github.com/smartfactory-kl/shellgonaut/convert"
 )
 
 const ConceptDescriptionRepositoryPath = "/concept-descriptions"
@@ -79,7 +79,7 @@ func (repoClient *ConceptDescriptionRepositoryClient) GetNextConceptDescriptionP
 	typedResult.Result = make([]types.IConceptDescription, 0, len(pagedResult.Result))
 
 	for _, rawIn := range pagedResult.Result {
-		cdItem, err := create.FromBytes(rawIn, jsonization.ConceptDescriptionFromJsonable)
+		cdItem, err := convert.JsonableTypeFromBytes(rawIn, jsonization.ConceptDescriptionFromJsonable)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse Concept Description: %w", err)
 		}
@@ -102,7 +102,7 @@ func (repoClient *ConceptDescriptionRepositoryClient) GetConceptDescriptionJsona
 	}
 	defer body.Close()
 
-	return bodyToJsonable(body)
+	return convert.BodyToJsonable(body)
 }
 
 // GetConceptDescription gets a parsed concept description
@@ -126,7 +126,7 @@ func (repoClient *ConceptDescriptionRepositoryClient) UploadConceptDescription(c
 		return fmt.Errorf("conceptDescription cannot be nil")
 	}
 
-	cdBytes, err := aasEntityToBytes(conceptDescription)
+	cdBytes, err := convert.JsonableTypeToBytes(conceptDescription)
 	if err != nil {
 		return fmt.Errorf("failed to convert conceptDescription to bytes: %w", err)
 	}
@@ -148,7 +148,7 @@ func (repoClient *ConceptDescriptionRepositoryClient) UpdateConceptDescription(c
 		return fmt.Errorf("concept description cannot be nil")
 	}
 
-	shellBytes, err := aasEntityToBytes(conceptDescription)
+	shellBytes, err := convert.JsonableTypeToBytes(conceptDescription)
 	if err != nil {
 		return fmt.Errorf("failed to convert shell to bytes: %w", err)
 	}

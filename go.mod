@@ -1,4 +1,4 @@
-module github.com/SmartFactory-KL/shellgonaut
+module github.com/smartfactory-kl/shellgonaut
 
 go 1.26.5
 

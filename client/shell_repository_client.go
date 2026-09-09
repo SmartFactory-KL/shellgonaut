@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/SmartFactory-KL/shellgonaut/create"
 	"github.com/aas-core-works/aas-core3.1-golang/jsonization"
 	"github.com/aas-core-works/aas-core3.1-golang/types"
+	"github.com/smartfactory-kl/shellgonaut/convert"
 )
 
 const ShellRepositoryPath = "/shells"
@@ -79,7 +79,7 @@ func (repoClient *ShellRepositoryClient) GetNextShellPage(cursor string, limit i
 	typedResult.Result = make([]types.IAssetAdministrationShell, 0, len(pagedResult.Result))
 
 	for _, rawIn := range pagedResult.Result {
-		shell, err := create.FromBytes(rawIn, jsonization.AssetAdministrationShellFromJsonable)
+		shell, err := convert.JsonableTypeFromBytes(rawIn, jsonization.AssetAdministrationShellFromJsonable)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse Shell: %w", err)
 		}
@@ -106,7 +106,7 @@ func (repoClient *ShellRepositoryClient) UploadShell(shell types.IAssetAdministr
 		return fmt.Errorf("shell cannot be nil")
 	}
 
-	shellBytes, err := aasEntityToBytes(shell)
+	shellBytes, err := convert.JsonableTypeToBytes(shell)
 	if err != nil {
 		return fmt.Errorf("failed to convert shell to bytes: %w", err)
 	}

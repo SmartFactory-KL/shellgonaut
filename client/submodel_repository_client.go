@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/SmartFactory-KL/shellgonaut/create"
 	"github.com/aas-core-works/aas-core3.1-golang/jsonization"
 	"github.com/aas-core-works/aas-core3.1-golang/types"
+	"github.com/smartfactory-kl/shellgonaut/convert"
 )
 
 const SubmodelRepositoryPath = "/submodels"
@@ -79,7 +79,7 @@ func (repoClient *SubmodelRepositoryClient) GetNextSubmodelPage(cursor string, l
 	typedResult.Result = make([]types.ISubmodel, 0, len(pagedResult.Result))
 
 	for _, rawIn := range pagedResult.Result {
-		submodel, err := create.FromBytes(rawIn, jsonization.SubmodelFromJsonable)
+		submodel, err := convert.JsonableTypeFromBytes(rawIn, jsonization.SubmodelFromJsonable)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse Shell: %w", err)
 		}
@@ -121,7 +121,7 @@ func (repoClient *SubmodelRepositoryClient) UploadSubmodel(submodel types.ISubmo
 		return fmt.Errorf("submodel cannot be nil")
 	}
 
-	submodelBytes, err := aasEntityToBytes(submodel)
+	submodelBytes, err := convert.JsonableTypeToBytes(submodel)
 	if err != nil {
 		return fmt.Errorf("failed to convert submodel to bytes: %w", err)
 	}

@@ -9,6 +9,7 @@ import (
 
 	"github.com/aas-core-works/aas-core3.1-golang/jsonization"
 	"github.com/aas-core-works/aas-core3.1-golang/types"
+	"github.com/smartfactory-kl/shellgonaut/convert"
 )
 
 const DiscoveryPath = "/lookup/shells"
@@ -67,7 +68,7 @@ func (discClient *DiscoveryClient) GetDiscoveryDescription() ([]byte, error) {
 func (discClient *DiscoveryClient) GetNextLookupPage(assetID []types.ISpecificAssetID, cursor string, limit int) (*PagedStringResult, error) {
 	targetURL := discClient.baseURL.JoinPath(DiscoveryPath)
 
-	assetBytes, err := aasEntityListToBytes(assetID)
+	assetBytes, err := convert.JsonableTypeListToBytes(assetID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert assetIDs to bytes: %w", err)
 	}
@@ -157,7 +158,7 @@ func (discClient *DiscoveryClient) UploadAssetIDList(shellID string, assetIDList
 		return fmt.Errorf("assetIDList cannot be nil or empty")
 	}
 
-	assetListBytes, err := aasEntityListToBytes(assetIDList)
+	assetListBytes, err := convert.JsonableTypeListToBytes(assetIDList)
 	if err != nil {
 		return fmt.Errorf("failed to convert asset ids into bytes: %w", err)
 	}

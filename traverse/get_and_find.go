@@ -5,9 +5,9 @@ import (
 	"slices"
 	"strings"
 
-	id_short_path "github.com/SmartFactory-KL/shellgonaut/path"
 	"github.com/aas-core-works/aas-core3.1-golang/stringification"
 	"github.com/aas-core-works/aas-core3.1-golang/types"
+	id_short_path "github.com/smartfactory-kl/shellgonaut/path"
 )
 
 // FindSubmodelByIdShort looks for a submodel within a list of ISubmodel by checking idShort.

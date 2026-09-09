@@ -1,242 +1,244 @@
 package descriptor
 
-import (
-	"fmt"
-)
+// UPDATE: For the first repo only release not needed, therefore not active
 
-/**
-IMPORTANT NOTE:
-These are only aimed at reading shell descriptor and submodel descriptor endpoints.
-They will not work with the "ToJsonable" method from aas-core-works!
-Maybe that will get added here in the future.
-*/
+// import (
+// 	"fmt"
+// )
 
-func AssetAdministrationShellDescriptorFromJsonable(jsonable any) (IAssetAdministrationShellDescriptor, error) {
-	m, err := isValidJsonable(jsonable)
-	if err != nil {
-		return nil, err
-	}
+// /**
+// IMPORTANT NOTE:
+// These are only aimed at reading shell descriptor and submodel descriptor endpoints.
+// They will not work with the "ToJsonable" method from aas-core-works!
+// Maybe that will get added here in the future.
+// */
 
-	result, err := shellDescriptorFromMap(m)
-	if err != nil {
-		return nil, err
-	}
+// func AssetAdministrationShellDescriptorFromJsonable(jsonable any) (IAssetAdministrationShellDescriptor, error) {
+// 	m, err := isValidJsonable(jsonable)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	return result, nil
-}
+// 	result, err := shellDescriptorFromMap(m)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-func shellDescriptorFromMap(m map[string]any) (result IAssetAdministrationShellDescriptor, err error) {
-	// var theDescription types.ILangStringTextType
-	// var theDisplayName types.ILangStringNameType
-	// var theExtensions []types.IExtension
-	// var theAdministration types.IAdministrativeInformation
-	// var theAssetKind *types.AssetKind
-	// var theAssetType *string
-	// var theEndpoints []IEndpoint
-	// var theGlobalAssetID *string
-	// var theIDShort *string
-	// var theID string
-	// var theSpecificAssetIDs []types.ISpecificAssetID
-	// var theSubmodelDescriptors []ISubmodelDescriptor
+// 	return result, nil
+// }
 
-	// TODO: Finish
-	return nil, nil
-}
+// func shellDescriptorFromMap(m map[string]any) (result IAssetAdministrationShellDescriptor, err error) {
+// 	// var theDescription types.ILangStringTextType
+// 	// var theDisplayName types.ILangStringNameType
+// 	// var theExtensions []types.IExtension
+// 	// var theAdministration types.IAdministrativeInformation
+// 	// var theAssetKind *types.AssetKind
+// 	// var theAssetType *string
+// 	// var theEndpoints []IEndpoint
+// 	// var theGlobalAssetID *string
+// 	// var theIDShort *string
+// 	// var theID string
+// 	// var theSpecificAssetIDs []types.ISpecificAssetID
+// 	// var theSubmodelDescriptors []ISubmodelDescriptor
 
-func SubmodelDescriptorFromJsonable(jsonable any) (ISubmodelDescriptor, error) {
-	m, err := isValidJsonable(jsonable)
-	if err != nil {
-		return nil, err
-	}
+// 	// TODO: Finish
+// 	return nil, nil
+// }
 
-	result, err := submodelDescriptorFromMap(m)
-	if err != nil {
-		return nil, err
-	}
+// func SubmodelDescriptorFromJsonable(jsonable any) (ISubmodelDescriptor, error) {
+// 	m, err := isValidJsonable(jsonable)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	return result, nil
-}
+// 	result, err := submodelDescriptorFromMap(m)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-func submodelDescriptorFromMap(m map[string]any) (result ISubmodelDescriptor, err error) {
-	// TODO: Finish
-	return nil, nil
-}
+// 	return result, nil
+// }
 
-func EndpointFromJsonable(jsonable any) (IEndpoint, error) {
-	m, err := isValidJsonable(jsonable)
-	if err != nil {
-		return nil, err
-	}
+// func submodelDescriptorFromMap(m map[string]any) (result ISubmodelDescriptor, err error) {
+// 	// TODO: Finish
+// 	return nil, nil
+// }
 
-	result, err := endpointFromMap(m)
-	if err != nil {
-		return nil, err
-	}
+// func EndpointFromJsonable(jsonable any) (IEndpoint, error) {
+// 	m, err := isValidJsonable(jsonable)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	return result, nil
-}
+// 	result, err := endpointFromMap(m)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-func endpointFromMap(m map[string]any) (result IEndpoint, err error) {
-	var theInterface string
-	var theProtocolInformation IProtocolInformation
+// 	return result, nil
+// }
 
-	for k, v := range m {
-		switch k {
-		case "interface":
-			parsedString, err := stringFromJsonable(v)
-			if err != nil {
-				return nil, prependName(err, k)
-			}
-			theInterface = parsedString
-		case "protocolInformation":
-			parsedProtocolInformation, err := ProtocolInformationFromJsonable(v)
-			if err != nil {
-				return nil, prependName(err, k)
-			}
-			theProtocolInformation = parsedProtocolInformation
-		}
-	}
+// func endpointFromMap(m map[string]any) (result IEndpoint, err error) {
+// 	var theInterface string
+// 	var theProtocolInformation IProtocolInformation
 
-	item := NewEndpoint(theInterface, theProtocolInformation)
+// 	for k, v := range m {
+// 		switch k {
+// 		case "interface":
+// 			parsedString, err := stringFromJsonable(v)
+// 			if err != nil {
+// 				return nil, prependName(err, k)
+// 			}
+// 			theInterface = parsedString
+// 		case "protocolInformation":
+// 			parsedProtocolInformation, err := ProtocolInformationFromJsonable(v)
+// 			if err != nil {
+// 				return nil, prependName(err, k)
+// 			}
+// 			theProtocolInformation = parsedProtocolInformation
+// 		}
+// 	}
 
-	return item, nil
-}
+// 	item := NewEndpoint(theInterface, theProtocolInformation)
 
-func ProtocolInformationFromJsonable(jsonable any) (IProtocolInformation, error) {
-	m, err := isValidJsonable(jsonable)
-	if err != nil {
-		return nil, err
-	}
+// 	return item, nil
+// }
 
-	result, err := protocolInformationFromMap(m)
-	if err != nil {
-		return nil, err
-	}
+// func ProtocolInformationFromJsonable(jsonable any) (IProtocolInformation, error) {
+// 	m, err := isValidJsonable(jsonable)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	return result, nil
-}
+// 	result, err := protocolInformationFromMap(m)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-func protocolInformationFromMap(m map[string]any) (IProtocolInformation, error) {
-	var theHref string
-	var theEndpointProtocol *string
-	var theEndpointProtocolVersion []string
-	var theSubprotocol *string
-	var theSubprotocolBody *string
-	var theSubprotocolBodyEncoding *string
-	var theSecurityAttributes []IProtocolInformationSecurityAttribute
+// 	return result, nil
+// }
 
-	for k, v := range m {
-		switch k {
-		case "href":
-			parsedString, err := stringFromJsonable(v)
-			if err != nil {
-				return nil, prependName(err, k)
-			}
-			theHref = parsedString
+// func protocolInformationFromMap(m map[string]any) (IProtocolInformation, error) {
+// 	var theHref string
+// 	var theEndpointProtocol *string
+// 	var theEndpointProtocolVersion []string
+// 	var theSubprotocol *string
+// 	var theSubprotocolBody *string
+// 	var theSubprotocolBodyEncoding *string
+// 	var theSecurityAttributes []IProtocolInformationSecurityAttribute
 
-		case "endpointProtocol":
-			parsedString, err := stringFromJsonable(v)
-			if err != nil {
-				return nil, prependName(err, k)
-			}
-			theEndpointProtocol = &parsedString
+// 	for k, v := range m {
+// 		switch k {
+// 		case "href":
+// 			parsedString, err := stringFromJsonable(v)
+// 			if err != nil {
+// 				return nil, prependName(err, k)
+// 			}
+// 			theHref = parsedString
 
-		case "endpointProtocolVersion":
-			parsedArr, err := simpletonListFromJsonable(v, "string", "")
-			if err != nil {
-				return nil, prependName(err, k)
-			}
-			theEndpointProtocolVersion = parsedArr
+// 		case "endpointProtocol":
+// 			parsedString, err := stringFromJsonable(v)
+// 			if err != nil {
+// 				return nil, prependName(err, k)
+// 			}
+// 			theEndpointProtocol = &parsedString
 
-		case "subprotocol":
-			parsedString, err := stringFromJsonable(v)
-			if err != nil {
-				return nil, prependName(err, k)
-			}
-			theSubprotocol = &parsedString
+// 		case "endpointProtocolVersion":
+// 			parsedArr, err := simpletonListFromJsonable(v, "string", "")
+// 			if err != nil {
+// 				return nil, prependName(err, k)
+// 			}
+// 			theEndpointProtocolVersion = parsedArr
 
-		case "subprotocolBody":
-			parsedString, err := stringFromJsonable(v)
-			if err != nil {
-				return nil, prependName(err, k)
-			}
-			theSubprotocolBody = &parsedString
+// 		case "subprotocol":
+// 			parsedString, err := stringFromJsonable(v)
+// 			if err != nil {
+// 				return nil, prependName(err, k)
+// 			}
+// 			theSubprotocol = &parsedString
 
-		case "subprotocolBodyEncoding":
-			parsedString, err := stringFromJsonable(v)
-			if err != nil {
-				return nil, prependName(err, k)
-			}
-			theSubprotocolBodyEncoding = &parsedString
-		case "securityAttributes":
-			parsedArr, err := jsonizationFromJsonableList[IProtocolInformationSecurityAttribute](v, ProtocolInformationSecurityAttributeFromJsonable)
-			if err != nil {
-				return nil, prependName(err, k)
-			}
-			theSecurityAttributes = parsedArr
-		default:
-			return nil, newDeserializationError(
-				fmt.Sprintf("Unexpected property: %s", k),
-			)
-		}
-	}
+// 		case "subprotocolBody":
+// 			parsedString, err := stringFromJsonable(v)
+// 			if err != nil {
+// 				return nil, prependName(err, k)
+// 			}
+// 			theSubprotocolBody = &parsedString
 
-	item := NewProtocolInformation(theHref)
+// 		case "subprotocolBodyEncoding":
+// 			parsedString, err := stringFromJsonable(v)
+// 			if err != nil {
+// 				return nil, prependName(err, k)
+// 			}
+// 			theSubprotocolBodyEncoding = &parsedString
+// 		case "securityAttributes":
+// 			parsedArr, err := jsonizationFromJsonableList(v, ProtocolInformationSecurityAttributeFromJsonable)
+// 			if err != nil {
+// 				return nil, prependName(err, k)
+// 			}
+// 			theSecurityAttributes = parsedArr
+// 		default:
+// 			return nil, newDeserializationError(
+// 				fmt.Sprintf("Unexpected property: %s", k),
+// 			)
+// 		}
+// 	}
 
-	item.SetEndpointProtocol(theEndpointProtocol)
-	item.SetEndpointProtocolVersion(theEndpointProtocolVersion)
-	item.SetSubprotocol(theSubprotocol)
-	item.SetSubprotocolBody(theSubprotocolBody)
-	item.SetSubprotocolBodyEncoding(theSubprotocolBodyEncoding)
-	item.SetSecurityAttributes(theSecurityAttributes)
+// 	item := NewProtocolInformation(theHref)
 
-	return item, nil
-}
+// 	item.SetEndpointProtocol(theEndpointProtocol)
+// 	item.SetEndpointProtocolVersion(theEndpointProtocolVersion)
+// 	item.SetSubprotocol(theSubprotocol)
+// 	item.SetSubprotocolBody(theSubprotocolBody)
+// 	item.SetSubprotocolBodyEncoding(theSubprotocolBodyEncoding)
+// 	item.SetSecurityAttributes(theSecurityAttributes)
 
-func ProtocolInformationSecurityAttributeFromJsonable(jsonable any) (IProtocolInformationSecurityAttribute, error) {
-	m, err := isValidJsonable(jsonable)
-	if err != nil {
-		return nil, err
-	}
+// 	return item, nil
+// }
 
-	result, err := protocolInformationSecurityInformationFromMap(m)
-	if err != nil {
-		return nil, err
-	}
+// func ProtocolInformationSecurityAttributeFromJsonable(jsonable any) (IProtocolInformationSecurityAttribute, error) {
+// 	m, err := isValidJsonable(jsonable)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	return result, nil
-}
+// 	result, err := protocolInformationSecurityInformationFromMap(m)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-func protocolInformationSecurityInformationFromMap(m map[string]any) (result IProtocolInformationSecurityAttribute, err error) {
-	var theType string
-	var theKey string
-	var theValue string
+// 	return result, nil
+// }
 
-	for k, v := range m {
-		switch k {
-		case "type":
-			theType, err = stringFromJsonable(v)
-			if err != nil {
-				return nil, prependName(err, k)
-			}
-		case "key":
-			theKey, err = stringFromJsonable(v)
-			if err != nil {
-				return nil, prependName(err, k)
-			}
-		case "value":
-			theValue, err = stringFromJsonable(v)
-			if err != nil {
-				return nil, prependName(err, k)
-			}
-		default:
-			return nil, newDeserializationError(
-				fmt.Sprintf("Unexpected property: %s", k),
-			)
-		}
-	}
+// func protocolInformationSecurityInformationFromMap(m map[string]any) (result IProtocolInformationSecurityAttribute, err error) {
+// 	var theType string
+// 	var theKey string
+// 	var theValue string
 
-	return NewProtocolInformationSecurityAttribute(
-		theType, theKey, theValue,
-	), nil
-}
+// 	for k, v := range m {
+// 		switch k {
+// 		case "type":
+// 			theType, err = stringFromJsonable(v)
+// 			if err != nil {
+// 				return nil, prependName(err, k)
+// 			}
+// 		case "key":
+// 			theKey, err = stringFromJsonable(v)
+// 			if err != nil {
+// 				return nil, prependName(err, k)
+// 			}
+// 		case "value":
+// 			theValue, err = stringFromJsonable(v)
+// 			if err != nil {
+// 				return nil, prependName(err, k)
+// 			}
+// 		default:
+// 			return nil, newDeserializationError(
+// 				fmt.Sprintf("Unexpected property: %s", k),
+// 			)
+// 		}
+// 	}
+
+// 	return NewProtocolInformationSecurityAttribute(
+// 		theType, theKey, theValue,
+// 	), nil
+// }
