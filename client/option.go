@@ -17,6 +17,7 @@ type ClientAuthStyle string
 const (
 	ClientAuthTokenSource ClientAuthStyle = "token"
 	ClientAuthApiKey      ClientAuthStyle = "apiKey"
+	ClientAuthHeader      ClientAuthStyle = "authHeader"
 )
 
 type ClientConfiguration struct {
@@ -24,8 +25,9 @@ type ClientConfiguration struct {
 
 	authStyle *ClientAuthStyle
 
-	tokenSource oauth2.TokenSource
-	apiKey      string
+	tokenSource     oauth2.TokenSource
+	apiKey          string
+	authHeaderValue string
 }
 
 // WithTokenSource adds a OAuth2 based auth to the http client used
@@ -41,6 +43,23 @@ func WithTokenSource(tokenSource oauth2.TokenSource) ClientOption {
 
 		clientCfg.authStyle = new(ClientAuthTokenSource)
 		clientCfg.tokenSource = tokenSource
+		return nil
+	}
+}
+
+func WithAuthorizationHeader(headerValue string) ClientOption {
+	return func(clientCfg *ClientConfiguration) error {
+		if clientCfg.authStyle != nil {
+			return fmt.Errorf("only one auth style can be selected, %s was already in place", *clientCfg.authStyle)
+		}
+
+		if len(headerValue) == 0 {
+			return fmt.Errorf("value for Authorization header cannot be empty")
+		}
+
+		clientCfg.authStyle = new(ClientAuthHeader)
+		clientCfg.authHeaderValue = headerValue
+
 		return nil
 	}
 }
@@ -97,9 +116,16 @@ func createHttpClientFromOptions(opts ...ClientOption) (*http.Client, error) {
 				Base:   httpRoundTripper,
 			}
 		case ClientAuthApiKey:
-			httpRoundTripper = &apiKeyTransport{
-				apiKey: clientCfg.apiKey,
-				base:   httpRoundTripper,
+			httpRoundTripper = &addedHeaderTransport{
+				headerKey:   "X-Api-Key",
+				headerValue: clientCfg.apiKey,
+				base:        httpRoundTripper,
+			}
+		case ClientAuthHeader:
+			httpRoundTripper = &addedHeaderTransport{
+				headerKey:   "Authorization",
+				headerValue: clientCfg.authHeaderValue,
+				base:        httpRoundTripper,
 			}
 		default:
 			return nil, fmt.Errorf("unkown auth style, abort")
@@ -116,14 +142,15 @@ func createHttpClientFromOptions(opts ...ClientOption) (*http.Client, error) {
 }
 
 // API Key RoundTripper
-type apiKeyTransport struct {
-	apiKey string
-	base   http.RoundTripper
+type addedHeaderTransport struct {
+	headerKey   string
+	headerValue string
+	base        http.RoundTripper
 }
 
-func (t *apiKeyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+func (t *addedHeaderTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req = req.Clone(req.Context())
-	req.Header.Set("X-Api-Key", t.apiKey)
+	req.Header.Set(t.headerKey, t.headerValue)
 
 	return t.base.RoundTrip(req)
 }
