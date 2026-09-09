@@ -80,7 +80,7 @@ func (discClient *DiscoveryClient) GetNextLookupPage(assetID []types.ISpecificAs
 		targetURL.String(),
 		cursor,
 		limit,
-		AdditionalHeader{
+		QueryItem{
 			Key:   "assetIds",
 			Value: encodedAssetBytes,
 		},

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 )
 
@@ -15,29 +16,38 @@ var (
 	ErrAlreadyExists = errors.New("entity already exists")
 )
 
-type AdditionalHeader struct {
+type QueryItem struct {
 	Key   string
 	Value string
 }
 
-func DoPagedGetRequest(httpClient *http.Client, targetUrl string, cursor string, limit int, additionalHeaders ...AdditionalHeader) (*PagedResultRaw, error) {
-	request, err := http.NewRequest(http.MethodGet, targetUrl, nil)
+func DoPagedGetRequest(httpClient *http.Client, targetUrl string, cursor string, limit int, additionalQueryItems ...QueryItem) (*PagedResultRaw, error) {
+	// add possible query params
+	parsedURL, err := url.Parse(targetUrl)
 	if err != nil {
-		return nil, fmt.Errorf("failed to craft Paged GET request: %w", err)
+		return nil, fmt.Errorf("failed to parse targed URL: %w", err)
 	}
 
+	query := parsedURL.Query()
 	if len(cursor) > 0 {
-		request.Header.Add("cursor", cursor)
+		query.Set("cursor", cursor)
 	}
 
 	if limit > 0 {
-		request.Header.Add("limit", strconv.Itoa(limit))
+		query.Set("limit", strconv.Itoa(limit))
 	}
 
-	if len(additionalHeaders) > 0 {
-		for _, header := range additionalHeaders {
-			request.Header.Add(header.Key, header.Value)
+	if len(additionalQueryItems) > 0 {
+		for _, queryItem := range additionalQueryItems {
+			query.Set(queryItem.Key, queryItem.Value)
 		}
+	}
+
+	parsedURL.RawQuery = query.Encode()
+
+	request, err := http.NewRequest(http.MethodGet, parsedURL.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to craft Paged GET request: %w", err)
 	}
 
 	resp, err := httpClient.Do(request)

@@ -3,6 +3,7 @@ package client
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 
@@ -66,7 +67,7 @@ func (repoClient *SubmodelRepositoryClient) GetSubmodelRepositoryDescription() (
 // ---------------------------------------- Submodel Pages ---------------------------
 // GetNextSubmodelPage requests the next page starting from cursor. empty cursor starts from the beginning, limit = 0 means no limit
 // however: basyx usually has a limit anyway.
-func (repoClient *SubmodelRepositoryClient) GetNextSubmodelPage(cursor string, limit int) (*PagedResult[types.ISubmodel], error) {
+func (repoClient *SubmodelRepositoryClient) GetNextSubmodelPage(cursor string, limit int, skipInvalid bool) (*PagedResult[types.ISubmodel], error) {
 	targetURL := repoClient.baseURL.JoinPath(SubmodelRepositoryPath)
 
 	pagedResult, err := DoPagedGetRequest(repoClient.httpClient, targetURL.String(), cursor, limit)
@@ -81,7 +82,12 @@ func (repoClient *SubmodelRepositoryClient) GetNextSubmodelPage(cursor string, l
 	for _, rawIn := range pagedResult.Result {
 		submodel, err := convert.JsonableTypeFromBytes(rawIn, jsonization.SubmodelFromJsonable)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse Shell: %w", err)
+			if skipInvalid {
+				slog.Warn("skipped submodel because it failed to parse", "raw", rawIn)
+				continue
+			} else {
+				return nil, fmt.Errorf("failed to parse Submodel: %w", err)
+			}
 		}
 		typedResult.Result = append(typedResult.Result, submodel)
 	}

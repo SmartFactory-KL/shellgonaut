@@ -3,6 +3,7 @@ package client
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 
@@ -66,7 +67,8 @@ func (repoClient *ShellRepositoryClient) GetShellRepositoryDescription() ([]byte
 // ---------------------------------------- Shell Pages ----------------------------
 // GetNextShellPage requests the next page starting from cursor. empty cursor starts from the beginning, limit = 0 means no limit
 // however: basyx usually has a limit anyway.
-func (repoClient *ShellRepositoryClient) GetNextShellPage(cursor string, limit int) (*PagedResult[types.IAssetAdministrationShell], error) {
+// skipInvalid will simply continue on a failed parse instead of returning an error
+func (repoClient *ShellRepositoryClient) GetNextShellPage(cursor string, limit int, skipInvalid bool) (*PagedResult[types.IAssetAdministrationShell], error) {
 	targetURL := repoClient.baseURL.JoinPath(ShellRepositoryPath)
 
 	pagedResult, err := DoPagedGetRequest(repoClient.httpClient, targetURL.String(), cursor, limit)
@@ -81,7 +83,12 @@ func (repoClient *ShellRepositoryClient) GetNextShellPage(cursor string, limit i
 	for _, rawIn := range pagedResult.Result {
 		shell, err := convert.JsonableTypeFromBytes(rawIn, jsonization.AssetAdministrationShellFromJsonable)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse Shell: %w", err)
+			if skipInvalid {
+				slog.Warn("skipped shell because it failed to parse", "raw", rawIn)
+				continue
+			} else {
+				return nil, fmt.Errorf("failed to parse Shell: %w", err)
+			}
 		}
 		typedResult.Result = append(typedResult.Result, shell)
 	}

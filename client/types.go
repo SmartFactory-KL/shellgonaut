@@ -8,6 +8,9 @@ import (
 	"github.com/aas-core-works/aas-core3.1-golang/types"
 )
 
+const SkipInvalid = true
+const FailOnInvalid = false
+
 // ------------------ Paged Results ------------
 type PagedResultMetadata struct {
 	Cursor string `json:"cursor"`
